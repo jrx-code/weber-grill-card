@@ -56,6 +56,9 @@
       opcją <code>variant</code>. To nie są makiety: każdy kafelek to instancja komponentu
       karmiona atrapą <code>hass</code>, więc to, co tu widać, jest tym, co zobaczysz
       na dashboardzie. Wybór wariantu jest w edytorze GUI, nie w kodzie.</p>
+    <p>Grafika to <b>zdjęcie i wektor Spirit EX-335</b> z plików wgranych do
+      <code>/local/weber-grill-card/images/</code> — przycięte do zawartości i zeskalowane
+      do 660 px (93 kB wektor, 146 kB zdjęcie). Rysowany wcześniej grill z SVG poszedł do kosza.</p>
   </div>
 
   <section class="card">
@@ -91,7 +94,7 @@
       Poniżej YAML, który zapisuje edytor — jedyna różnica między kafelkami wyżej to ostatnia linia.</p>
 <pre>type: custom:weber-grill-card
 name: Spirit EX325
-variant: illustration        # ring | type | hybrid
+variant: photo               # vector | compact | ring | type
 cavity_temp: sensor.spirit_ex325_temperatura_komory
 cavity_target: sensor.spirit_ex325_cel_komory
 battery: sensor.spirit_ex325_bateria
@@ -130,14 +133,14 @@ class HaIconStub extends HTMLElement {
 if (!customElements.get('ha-icon')) customElements.define('ha-icon', HaIconStub);
 
 const WARIANTY = [
-  ['illustration', 'A — ilustracja', 'rysowany grill, odczyt na plakietce',
-   'Grill jest bohaterem kadru. Żar prześwituje spod pokrywy, dym rośnie z temperaturą. Najbardziej „grillowy”, najmniej danych na jednostkę powierzchni.'],
-  ['ring', 'B — pierścień', 'wskaźnik dojścia do celu',
-   'Łuk pokazuje drogę do celu, nie surową liczbę — z drugiego końca kuchni widać, czy grill jest gotowy.'],
-  ['type', 'C — typograficzny', 'sama liczba i pasek',
-   'Bez rysunku: wielka liczba i pasek z celem. Najgęstszy informacyjnie, najlepiej znosi wąskie kolumny.'],
-  ['hybrid', 'D — hybryda', 'liczba prowadzi, grill towarzyszy',
-   'Kompromis: liczba i pasek prowadzą wzrok, sylwetka daje kontekst bez zjadania miejsca.'],
+  ['photo', 'A — zdjęcie', 'render produktowy Spirit EX-335',
+   'Zdjęcie grilla, odczyt w wolnym rogu nad pokrywą (kaptur zajmuje 22–78% szerokości, więc liczba nigdy nie ląduje na logo Webera). Żar świeci przez szczelinę pokrywy, dym rośnie z temperaturą.'],
+  ['vector', 'B — wektor', 'ta sama kompozycja, płaska grafika',
+   'Identyczny układ na grafice wektorowej. Lżejszy plik, spokojniejszy na ciemnym panelu, lepiej znosi małe rozmiary niż fotorealistyczny render.'],
+  ['compact', 'C — kompakt', 'liczba prowadzi, grill obok',
+   'Liczba i pasek do celu po lewej, grafika po prawej. Dla wąskiej kolumny albo gdy karta ma dzielić miejsce z innymi.'],
+  ['ring', 'D — pierścień', 'bez grafiki, wskaźnik celu',
+   'Dla porównania wariant bez grilla: łuk pokazuje drogę do celu, czytelny z drugiego końca kuchni.'],
 ];
 
 const E = (id, state, attrs = {}) => [id, { entity_id: id, state: String(state), attributes: attrs }];
