@@ -15,25 +15,30 @@
   .card h2 { margin: 0 0 4px; font-size: 17px; }
   .card > p { margin: 0 0 14px; color: var(--muted); font-size: 13.5px; max-width: 92ch; }
 
-  .siatka { display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; }
-  @media (max-width: 900px) { .siatka { grid-template-columns: 1fr; } }
-  .wariant { display: flex; flex-direction: column; gap: 7px; min-width: 0; }
-  .wariant h3 { margin: 0; font-size: 13.5px; font-weight: 650; letter-spacing: .02em; }
-  .wariant h3 em { font-style: normal; color: var(--muted); font-weight: 400; }
-  .wariant .why { font-size: 12.5px; color: var(--muted); margin: 0; }
+  .glowna { display: grid; grid-template-columns: minmax(340px, 460px) 1fr; gap: 22px; align-items: start; }
+  @media (max-width: 1000px) { .glowna { grid-template-columns: 1fr; } }
 
-  .controls { display: flex; align-items: center; gap: 16px; margin-top: 16px; flex-wrap: wrap; }
-  .sliderbox { flex: 1; min-width: 190px; }
-  .sliderbox input[type=range] { width: 100%; min-width: 0; accent-color: var(--accent); }
-  .ticks { display: flex; justify-content: space-between; margin-top: 2px; font-size: 11px;
-    color: var(--muted); font-variant-numeric: tabular-nums; letter-spacing: .04em; }
-  .przel { display: flex; gap: 14px; flex-wrap: wrap; font-size: 13px; color: var(--muted); }
-  .przel label { display: inline-flex; align-items: center; gap: 6px; cursor: pointer; }
+  .suwaki { display: grid; gap: 3px; }
+  .grp { font-size: 10px; letter-spacing: 2px; text-transform: uppercase; color: rgba(255,255,255,.34);
+         font-weight: 700; margin: 12px 0 4px; }
+  .grp:first-child { margin-top: 0; }
+  .row { display: grid; grid-template-columns: 118px 1fr 54px; gap: 10px; align-items: center; }
+  .row label { font-size: 12.5px; color: var(--muted); }
+  .row output { font-size: 12.5px; text-align: right; font-variant-numeric: tabular-nums; }
+  input[type=range] { width: 100%; min-width: 0; accent-color: var(--accent); }
+  .btns { display: flex; gap: 9px; flex-wrap: wrap; margin-top: 14px; }
   button.zwykly { border: 1px solid var(--line); background: rgba(124,179,249,.10); color: var(--accent);
     border-radius: 10px; padding: 7px 13px; font-size: 13px; cursor: pointer; }
   button.zwykly:hover { background: rgba(124,179,249,.2); }
-  .stan { min-width: 210px; font-size: 13px; }
-  .stan b { font-size: 15px; } .stan span { color: var(--muted); font-variant-numeric: tabular-nums; }
+  button.zwykly[aria-pressed=true] { background: rgba(124,179,249,.28); color: #fff; }
+
+  .siatka { display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; margin-top: 4px; }
+  @media (max-width: 900px) { .siatka { grid-template-columns: 1fr; } }
+  .wariant { display: flex; flex-direction: column; gap: 7px; min-width: 0; }
+  .wariant h3 { margin: 0; font-size: 13.5px; font-weight: 650; }
+  .wariant h3 em { font-style: normal; color: var(--muted); font-weight: 400; }
+  .wariant .why { font-size: 12.5px; color: var(--muted); margin: 0; }
+
   pre { margin: 12px 0 0; background: #0a0d12; border: 1px solid var(--line); border-radius: 12px;
     padding: 12px 14px; font: 12.5px/1.5 ui-monospace, monospace; color: #b9c4d4; overflow-x: auto; }
   .note { font-size: 13px; color: var(--muted); background: #0a0d12; border: 1px solid var(--line);
@@ -41,7 +46,6 @@
   .note strong { color: var(--text); }
   .note code { color: #b9c4d4; font: 12.5px ui-monospace, monospace; }
 
-  /* HA design tokens the card reads, approximated so it looks the same here. */
   ha-card { display: block; background: #1c222d; border-radius: 14px;
     --primary-text-color: #e8ebf1; --secondary-text-color: #96a0b0; --divider-color: #2b3341;
     --secondary-background-color: #212836; --disabled-text-color: #6c7583;
@@ -50,74 +54,60 @@
 </style>
 <main>
   <div class="lead">
-    <h1>Grill: karta Lovelace w czterech wyglądach</h1>
-    <p>Cztery kafelki niżej to <b>ta sama karta</b> — jeden plik
-      <code>weber-grill-card.js</code>, który pojedzie na panel — różniąca się wyłącznie
-      opcją <code>variant</code>. To nie są makiety: każdy kafelek to instancja komponentu
-      karmiona atrapą <code>hass</code>, więc to, co tu widać, jest tym, co zobaczysz
-      na dashboardzie. Wybór wariantu jest w edytorze GUI, nie w kodzie.</p>
-    <p>Grafika to <b>zdjęcie i wektor Spirit EX-335</b> z plików wgranych do
-      <code>/local/weber-grill-card/images/</code> — przycięte do zawartości i zeskalowane
-      do 660 px (93 kB wektor, 146 kB zdjęcie). Rysowany wcześniej grill z SVG poszedł do kosza.</p>
+    <h1>Grill: termostat obok grilla</h1>
+    <p>Wariant <code>thermo</code> — pierścień z temperaturą komory po lewej, zdjęcie grilla
+      po prawej. Odczyt komory z celem leży <b>na komorze</b>, sonda po prawej stronie,
+      a komora świeci: <b>niebiesko na zimno, żółto przy rozgrzewaniu, czerwono na gorąco</b>.</p>
+    <p>Kafelek niżej to <b>ta sama karta</b>, która pojedzie na panel — instancja komponentu
+      z pliku <code>weber-grill-card.js</code>, nie makieta. Suwaki zmieniają jej
+      <code>layout</code> na żywo; przycisk „wypisz parametry” daje gotowy YAML do wklejenia.</p>
   </div>
 
   <section class="card">
-    <h2>Cztery warianty, ten sam stan</h2>
-    <p>Suwaki sterują wszystkimi czterema naraz, więc różnica między kafelkami to wyłącznie
-      sposób pokazania tej samej liczby. Przyciski ustawiają sytuacje z życia: zimny grill,
-      rozgrzewanie, gotowe mięso i grill, który odpadł.</p>
-    <div class="siatka" id="siatka"></div>
+    <h2>Ustawianie i podgląd</h2>
+    <p>Suwaki przesuwają elementy w procentach obrazka, więc ustawienia trzymają się grafiki
+      niezależnie od szerokości karty. Sceny przełączają dane, żeby sprawdzić kolor poświaty.</p>
 
-    <div class="controls">
-      <div class="przel" id="sceny">
-        <button class="zwykly" data-s="zimny">zimny</button>
-        <button class="zwykly" data-s="grzanie">rozgrzewanie</button>
-        <button class="zwykly" data-s="alarm">cel osiągnięty</button>
-        <button class="zwykly" data-s="offline">niedostępny</button>
+    <div class="glowna">
+      <div>
+        <div class="suwaki" id="suwaki"></div>
+        <div class="btns">
+          <button class="zwykly" id="wypisz">wypisz parametry</button>
+          <button class="zwykly" id="reset">domyślne</button>
+          <button class="zwykly" id="art">grafika: zdjęcie</button>
+        </div>
+        <pre id="yaml" style="display:none"></pre>
       </div>
-      <div class="sliderbox">
-        <input type="range" id="cav" min="15" max="320" value="31" aria-label="Temperatura komory">
-        <div class="ticks"><span>komora 15°</span><span id="cavO">31 °C</span><span>320°</span></div>
+
+      <div>
+        <div class="btns" style="margin: 0 0 12px">
+          <button class="zwykly" data-s="zimny" aria-pressed="true">zimny 31°</button>
+          <button class="zwykly" data-s="grzanie">rozgrzewanie 120°</button>
+          <button class="zwykly" data-s="goracy">gorący 240°</button>
+          <button class="zwykly" data-s="alarm">alarm</button>
+          <button class="zwykly" data-s="offline">niedostępny</button>
+        </div>
+        <div id="podglad"></div>
+        <p class="why" id="opisStanu" style="font-size:12.5px;color:var(--muted);margin:9px 2px 0"></p>
       </div>
-      <div class="sliderbox">
-        <input type="range" id="prb" min="5" max="100" value="23" aria-label="Sonda">
-        <div class="ticks"><span>sonda 5°</span><span id="prbO">23 °C</span><span>100°</span></div>
-      </div>
-      <div class="stan"><b id="opisStanu">zimny grill</b><br><span id="info"></span></div>
     </div>
   </section>
 
   <section class="card">
-    <h2>Konfiguracja</h2>
-    <p>Karta jest wybieralna z galerii („Weber Grill Card”, z podglądem) i ma edytor GUI:
-      pola encji to natywne pickery HA, wygląd to lista rozwijana, sondy dodaje się przyciskiem.
-      Poniżej YAML, który zapisuje edytor — jedyna różnica między kafelkami wyżej to ostatnia linia.</p>
-<pre>type: custom:weber-grill-card
-name: Spirit EX325
-variant: photo               # vector | compact | ring | type
-cavity_temp: sensor.spirit_ex325_temperatura_komory
-cavity_target: sensor.spirit_ex325_cel_komory
-battery: sensor.spirit_ex325_bateria
-wifi: binary_sensor.spirit_ex325_wifi
-cloud: binary_sensor.spirit_ex325_chmura
-bluetooth: binary_sensor.spirit_ex325_bluetooth
-last_alarm: sensor.spirit_ex325_ostatni_alarm
-probes:
-  - name: Sonda 1
-    temp: sensor.spirit_ex325_sonda_1
-    target: sensor.spirit_ex325_sonda_1_cel</pre>
+    <h2>Pozostałe warianty</h2>
+    <p>Dla porównania, ta sama karta w innych ustawieniach <code>variant</code>. Wszystkie
+      reagują na sceny wybrane wyżej.</p>
+    <div class="siatka" id="siatka"></div>
   </section>
 
   <div class="note">
-    <strong>Czego tu nie ma.</strong> Ikony <code>ha-icon</code> istnieją tylko wewnątrz frontendu
-    HA — na tej stronie zastępuje je namiastka, więc kształt ikonek stanu i sondy jest
-    orientacyjny. Wszystko poza nimi (układ, typografia, kolory, rysunek grilla, paski, alarm)
-    pochodzi z pliku karty. Nic z tego nie jest jeszcze na żadnym dashboardzie.
+    <strong>Czego tu nie ma.</strong> Ikony <code>ha-icon</code> istnieją tylko w środku
+    frontendu HA — tutaj zastępuje je namiastka, więc kształt ikonek stanu jest orientacyjny.
+    Reszta pochodzi z pliku karty. Nic nie jest jeszcze na żadnym dashboardzie.
   </div>
 </main>
 
 <script>
-// ha-icon only exists inside the HA frontend; a stand-in keeps the layout honest.
 const GLYPHS = { 'mdi:wifi': '≋', 'mdi:cloud-outline': '☁', 'mdi:bluetooth': '✶',
                  'mdi:bell-ring': '!', 'mdi:thermometer-probe': '|' };
 class HaIconStub extends HTMLElement {
@@ -132,15 +122,21 @@ class HaIconStub extends HTMLElement {
 }
 if (!customElements.get('ha-icon')) customElements.define('ha-icon', HaIconStub);
 
-const WARIANTY = [
-  ['photo', 'A — zdjęcie', 'render produktowy Spirit EX-335',
-   'Zdjęcie grilla, odczyt w wolnym rogu nad pokrywą (kaptur zajmuje 22–78% szerokości, więc liczba nigdy nie ląduje na logo Webera). Żar świeci przez szczelinę pokrywy, dym rośnie z temperaturą.'],
-  ['vector', 'B — wektor', 'ta sama kompozycja, płaska grafika',
-   'Identyczny układ na grafice wektorowej. Lżejszy plik, spokojniejszy na ciemnym panelu, lepiej znosi małe rozmiary niż fotorealistyczny render.'],
-  ['compact', 'C — kompakt', 'liczba prowadzi, grill obok',
-   'Liczba i pasek do celu po lewej, grafika po prawej. Dla wąskiej kolumny albo gdy karta ma dzielić miejsce z innymi.'],
-  ['ring', 'D — pierścień', 'bez grafiki, wskaźnik celu',
-   'Dla porównania wariant bez grilla: łuk pokazuje drogę do celu, czytelny z drugiego końca kuchni.'],
+// Slider definitions: [key, label, min, max, unit, group]
+const SUWAKI = [
+  ['ring_w', 'szerokość pierścienia', 25, 65, '%', 'Układ'],
+  ['img_scale', 'wielkość grilla', 60, 130, '%', 'Układ'],
+  ['cavity_x', 'komora ↔', 0, 100, '%', 'Odczyt komory'],
+  ['cavity_y', 'komora ↕', 0, 100, '%', 'Odczyt komory'],
+  ['cavity_size', 'komora wielkość', 50, 180, '%', 'Odczyt komory'],
+  ['probe_x', 'sonda ↔', 0, 130, '%', 'Sonda'],
+  ['probe_y', 'sonda ↕', 0, 100, '%', 'Sonda'],
+  ['probe_size', 'sonda wielkość', 50, 180, '%', 'Sonda'],
+  ['glow_x', 'poświata ↔', 0, 100, '%', 'Poświata komory'],
+  ['glow_y', 'poświata ↕', 0, 100, '%', 'Poświata komory'],
+  ['glow_w', 'poświata szer.', 10, 120, '%', 'Poświata komory'],
+  ['glow_h', 'poświata wys.', 4, 60, '%', 'Poświata komory'],
+  ['glow_blur', 'rozmycie', 0, 40, 'px', 'Poświata komory'],
 ];
 
 const E = (id, state, attrs = {}) => [id, { entity_id: id, state: String(state), attributes: attrs }];
@@ -168,74 +164,116 @@ const BASE = {
 };
 
 const SCENY = {
-  zimny:   { opis: 'zimny grill', cavity: 31, cavityTarget: 105, probe: 23, probeTarget: 40, batt: 95 },
-  grzanie: { opis: 'rozgrzewanie', cavity: 186, cavityTarget: 220, probe: 44, probeTarget: 68, batt: 90 },
-  alarm:   { opis: 'cel osiągnięty', cavity: 214, cavityTarget: 220, probe: 68, probeTarget: 68, batt: 86,
+  zimny:   { opis: 'zimny grill — poświata niebieska', cavity: 31, cavityTarget: 105, probe: 23, probeTarget: 40, batt: 95 },
+  grzanie: { opis: 'rozgrzewanie — poświata żółta', cavity: 120, cavityTarget: 220, probe: 38, probeTarget: 68, batt: 92 },
+  goracy:  { opis: 'gorący — poświata czerwona', cavity: 240, cavityTarget: 220, probe: 58, probeTarget: 68, batt: 88 },
+  alarm:   { opis: 'sonda osiągnęła cel', cavity: 214, cavityTarget: 220, probe: 68, probeTarget: 68, batt: 86,
              alarm: 'Probe 1 Temperature Reached 68°C' },
-  offline: { opis: 'grill niedostępny' },
+  offline: { opis: 'grill niedostępny — karta przygasa', },
 };
 
-const karty = [];
-const siatka = document.getElementById('siatka');
-
-function zbuduj() {
-WARIANTY.forEach(([variant, tytul, pod, why]) => {
-  const box = document.createElement('div');
-  box.className = 'wariant';
-  box.innerHTML = `<h3>${tytul} <em>— ${pod}</em></h3>`;
-  const el = document.createElement('weber-grill-card');
-  el.setConfig({ ...BASE, variant });
-  box.appendChild(el);
-  const p = document.createElement('p');
-  p.className = 'why'; p.textContent = why;
-  box.appendChild(p);
-  siatka.appendChild(box);
-  karty.push(el);
-});
-}
+const INNE = [
+  ['photo', 'Zdjęcie', 'odczyt w wolnym rogu nad pokrywą'],
+  ['vector', 'Wektor', 'ten sam układ na płaskiej grafice'],
+  ['compact', 'Kompakt', 'liczba prowadzi, grafika obok'],
+  ['ring', 'Pierścień', 'sam wskaźnik, bez grafiki'],
+];
 
 const $ = (id) => document.getElementById(id);
-let scena = { ...SCENY.zimny };
+let LAYOUT = {}, DEFAULTS_LAYOUT = {}, scena = { ...SCENY.zimny }, artwork = 'photo';
+let glowna = null; const inne = [];
 
-function render() {
-  const h = mockHass(scena);
-  karty.forEach((k) => { k.hass = h; });
-  $('cavO').textContent = scena.cavity == null ? '—' : `${scena.cavity} °C`;
-  $('prbO').textContent = scena.probe == null ? '—' : `${scena.probe} °C`;
-  $('opisStanu').textContent = scena.opis || '—';
-  $('info').textContent = scena.cavity == null ? 'encje niedostępne — karta przygasa'
-    : `cel komory ${scena.cavityTarget} °C · sonda ${scena.probe}/${scena.probeTarget} °C`;
-  if (scena.cavity != null) $('cav').value = scena.cavity;
-  if (scena.probe != null) $('prb').value = scena.probe;
+function budujSuwaki() {
+  const host = $('suwaki');
+  let lastGrp = '';
+  SUWAKI.forEach(([key, label, min, max, unit, grp]) => {
+    if (grp !== lastGrp) {
+      const h = document.createElement('div');
+      h.className = 'grp'; h.textContent = grp;
+      host.appendChild(h); lastGrp = grp;
+    }
+    const row = document.createElement('div');
+    row.className = 'row';
+    row.innerHTML = `<label for="s_${key}">${label}</label>
+      <input type="range" id="s_${key}" min="${min}" max="${max}" step="1" value="${LAYOUT[key]}">
+      <output id="o_${key}">${LAYOUT[key]}${unit}</output>`;
+    host.appendChild(row);
+    row.querySelector('input').addEventListener('input', (e) => {
+      LAYOUT[key] = +e.target.value;
+      $(`o_${key}`).textContent = LAYOUT[key] + unit;
+      przerysuj();
+    });
+  });
 }
 
-$('cav').addEventListener('input', (e) => {
-  if (scena.cavity == null) scena = { ...SCENY.zimny };
-  scena = { ...scena, cavity: +e.target.value, opis: 'ręcznie' };
-  render();
+function odswiezSuwaki() {
+  SUWAKI.forEach(([key, , , , unit]) => {
+    const el = $(`s_${key}`); if (!el) return;
+    el.value = LAYOUT[key];
+    $(`o_${key}`).textContent = LAYOUT[key] + unit;
+  });
+}
+
+function przerysuj() {
+  const h = mockHass(scena);
+  glowna.setConfig({ ...BASE, variant: 'thermo', artwork, layout: { ...LAYOUT } });
+  glowna.hass = h;
+  inne.forEach(({ el, variant }) => { el.setConfig({ ...BASE, variant, artwork }); el.hass = h; });
+  $('opisStanu').textContent = scena.opis || '';
+}
+
+function start() {
+  // Defaults come from the card itself, so the sliders always start where the
+  // production component starts — no second copy of the numbers to drift.
+  DEFAULTS_LAYOUT = { ...(window.WEBER_THERMO_LAYOUT || {}) };
+  LAYOUT = { ...DEFAULTS_LAYOUT };
+
+  glowna = document.createElement('weber-grill-card');
+  $('podglad').appendChild(glowna);
+
+  INNE.forEach(([variant, tytul, pod]) => {
+    const box = document.createElement('div');
+    box.className = 'wariant';
+    box.innerHTML = `<h3>${tytul} <em>— ${pod}</em></h3>`;
+    const el = document.createElement('weber-grill-card');
+    box.appendChild(el);
+    $('siatka').appendChild(box);
+    inne.push({ el, variant });
+  });
+
+  budujSuwaki();
+  przerysuj();
+}
+
+document.querySelectorAll('[data-s]').forEach((b) => b.addEventListener('click', () => {
+  document.querySelectorAll('[data-s]').forEach((x) => x.setAttribute('aria-pressed', x === b));
+  scena = { ...SCENY[b.dataset.s] };
+  przerysuj();
+}));
+
+$('reset').addEventListener('click', () => { LAYOUT = { ...DEFAULTS_LAYOUT }; odswiezSuwaki(); przerysuj(); });
+$('art').addEventListener('click', (e) => {
+  artwork = artwork === 'photo' ? 'vector' : 'photo';
+  e.target.textContent = 'grafika: ' + (artwork === 'photo' ? 'zdjęcie' : 'wektor');
+  przerysuj();
 });
-$('prb').addEventListener('input', (e) => {
-  if (scena.probe == null) scena = { ...SCENY.zimny };
-  scena = { ...scena, probe: +e.target.value, opis: 'ręcznie' };
-  render();
-});
-document.getElementById('sceny').addEventListener('click', (e) => {
-  const s = e.target.dataset.s;
-  if (!s) return;
-  scena = { ...SCENY[s] };
-  render();
+$('wypisz').addEventListener('click', () => {
+  const zmienione = Object.entries(LAYOUT)
+    .filter(([k, v]) => v !== DEFAULTS_LAYOUT[k]);
+  const body = (zmienione.length ? zmienione : Object.entries(LAYOUT))
+    .map(([k, v]) => `  ${k}: ${v}`).join('\n');
+  $('yaml').style.display = 'block';
+  $('yaml').textContent =
+    `variant: thermo\nartwork: ${artwork}\nlayout:\n${body}\n` +
+    (zmienione.length ? '' : '# (wszystko domyślne — nic nie zmieniałeś)');
 });
 
-// Home Assistant serves /local/ with `Cache-Control: max-age=2678400` — 31 days.
-// A plain <script src> here happily replays a stale copy of the card (it did),
-// so the file is pulled with a cache-buster and the demo starts only once the
-// real component is defined.
+// HA serves /local/ with max-age=2678400, so the card must be pulled with a
+// cache-buster or the browser replays a month-old copy (it did).
 const s = document.createElement('script');
 s.src = '/local/weber-grill-card/weber-grill-card.js?t=' + Date.now();
-s.onload = () => { zbuduj(); render(); };
-s.onerror = () => {
-  siatka.innerHTML = '<p class="why">Nie udało się wczytać weber-grill-card.js — ' +
-    'sprawdź, czy plik leży w /config/www/weber-grill-card/.</p>';
-};
+s.onload = start;
+s.onerror = () => { $('podglad').innerHTML =
+  '<p class="why">Nie udało się wczytać weber-grill-card.js z /local/weber-grill-card/.</p>'; };
 document.head.appendChild(s);
 </script>
