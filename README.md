@@ -86,10 +86,10 @@ probes:
 | `wifi` / `cloud` / `bluetooth` | entity | — | connectivity chips |
 | `last_alarm` | entity | — | alert sensor (state = title, attrs `text`, `when`) |
 | `probes` | list | `[]` | `{name, temp, target}` per probe |
-| `show_gauge` / `show_artwork` | bool | `true` | halves of the `thermo` look |
+| `show_gauge` / `show_artwork` | bool | `true` | halves of the `thermo` look — YAML only, no GUI switch |
 | `show_glow` / `show_probe_overlay` | bool | `true` | glow, probe chip on artwork |
 | `show_status` | bool | `true` | status chips |
-| `animate` | bool | `true` | smoke animation |
+| `animate` | bool | `true` | smoke animation; drawn in the `artwork` look only, so the GUI offers the switch there only |
 | `alarm_minutes` | number | `30` | hide the alert banner after N minutes (0 = never) |
 | `glow_cold` / `glow_warm` / `glow_hot` | colour | blue / yellow / red | glow colours |
 | `glow_warm_at` / `glow_hot_at` | number | `90` / `200` | °C thresholds between them |

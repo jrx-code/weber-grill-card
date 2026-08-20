@@ -90,10 +90,10 @@ probes:
 | `wifi` / `cloud` / `bluetooth` | encja | — | ikony łączności |
 | `last_alarm` | encja | — | encja alarmu (stan = tytuł, atrybuty `text`, `when`) |
 | `probes` | lista | `[]` | `{name, temp, target}` na sondę |
-| `show_gauge` / `show_artwork` | tak/nie | `true` | połówki wyglądu `thermo` |
+| `show_gauge` / `show_artwork` | tak/nie | `true` | połówki wyglądu `thermo` — tylko YAML, bez przełącznika w GUI |
 | `show_glow` / `show_probe_overlay` | tak/nie | `true` | poświata, sonda na grafice |
 | `show_status` | tak/nie | `true` | ikony stanu |
-| `animate` | tak/nie | `true` | animacja dymu |
+| `animate` | tak/nie | `true` | animacja dymu; rysowana tylko w wyglądzie `artwork`, więc GUI pokazuje przełącznik tylko tam |
 | `alarm_minutes` | liczba | `30` | ukryj pasek alarmu po N minutach (0 = nigdy) |
 | `glow_cold` / `glow_warm` / `glow_hot` | kolor | niebieski / żółty / czerwony | kolory poświaty |
 | `glow_warm_at` / `glow_hot_at` | liczba | `90` / `200` | progi °C między nimi |
