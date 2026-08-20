@@ -272,12 +272,12 @@ $('wypisz').addEventListener('click', () => {
     (zmienione.length ? '' : '# (wszystko domyślne — nic nie zmieniałeś)');
 });
 
-// HA serves /local/ with max-age=2678400, so the card must be pulled with a
+// HA serves /hacsfiles/ with a long max-age, so the card must be pulled with a
 // cache-buster or the browser replays a month-old copy (it did).
 const s = document.createElement('script');
-s.src = '/local/weber-grill-card/weber-grill-card.js?t=' + Date.now();
+s.src = '/hacsfiles/weber-grill-card/weber-grill-card.js?t=' + Date.now();
 s.onload = start;
 s.onerror = () => { $('podglad').innerHTML =
-  '<p class="why">Nie udało się wczytać weber-grill-card.js z /local/weber-grill-card/.</p>'; };
+  '<p class="why">Nie udało się wczytać weber-grill-card.js z /hacsfiles/weber-grill-card/ — sprawdź instalację w HACS.</p>'; };
 document.head.appendChild(s);
 </script>
