@@ -24,8 +24,8 @@ konfigurowalna — zadziała z dowolnym źródłem temperatury.
 - **Ikony stanu** — WiFi, chmura, Bluetooth, bateria; każda otwiera szczegóły.
 - **Grill niedostępny** — karta przygasa i mówi to wprost, zamiast pokazywać
   ostatnią znaną liczbę jak aktualną.
-- **Sześć wyglądów**, różnica to jedna opcja: `thermo`, `photo`, `vector`,
-  `compact`, `ring`, `type`.
+- **Pięć wyglądów**, różnica to jedna opcja: `thermo`, `artwork`, `compact`,
+  `ring`, `type` — a pod każdym z nich zdjęcie albo wektor.
 - **Polski i angielski**, zgodnie z językiem Home Assistant albo ustawiony
   sztywno per karta.
 
@@ -60,7 +60,7 @@ to, co zapisuje edytor.
 ```yaml
 type: custom:weber-grill-card
 name: Spirit EX325
-variant: thermo          # photo | vector | compact | ring | type
+variant: thermo          # artwork | compact | ring | type
 artwork: photo           # photo | vector
 language: auto           # auto | pl | en
 cavity_temp: sensor.spirit_ex325_temperatura_komory
@@ -82,7 +82,7 @@ probes:
 |---|---|---|---|
 | `name` | tekst | `Grill` | podpis nad grafiką |
 | `title` | tekst | — | nagłówek karty (pomiń, by go nie było) |
-| `variant` | tekst | `thermo` | wygląd |
+| `variant` | tekst | `thermo` | wygląd; zdjęcie/wektor to `artwork`, nie wygląd |
 | `artwork` | tekst | `photo` | `photo` albo `vector` |
 | `language` | tekst | `auto` | `auto` idzie za Home Assistant |
 | `cavity_temp` / `cavity_target` | encja | — | temperatura komory i cel |

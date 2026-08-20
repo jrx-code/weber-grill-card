@@ -23,8 +23,8 @@ configurable — any temperature source works.
 - **Status chips** — WiFi, cloud, Bluetooth, battery; each opens more-info.
 - **Offline handling** — the card dims and says so instead of presenting a stale
   number as current.
-- **Six looks**, one option apart: `thermo`, `photo`, `vector`, `compact`,
-  `ring`, `type`.
+- **Five looks**, one option apart: `thermo`, `artwork`, `compact`, `ring`,
+  `type` — with photo or vector artwork under each of them.
 - **Polish and English**, following Home Assistant's language or pinned per card.
 
 ## Install
@@ -56,7 +56,7 @@ coordinate, and centre / reset shortcuts. YAML below is what the editor writes.
 ```yaml
 type: custom:weber-grill-card
 name: Spirit EX325
-variant: thermo          # photo | vector | compact | ring | type
+variant: thermo          # artwork | compact | ring | type
 artwork: photo           # photo | vector
 language: auto           # auto | pl | en
 cavity_temp: sensor.spirit_ex325_temperatura_komory
@@ -78,7 +78,7 @@ probes:
 |---|---|---|---|
 | `name` | string | `Grill` | label above the artwork |
 | `title` | string | — | card header (omit for none) |
-| `variant` | string | `thermo` | look |
+| `variant` | string | `thermo` | look; photo vs. vector is `artwork`, not a look |
 | `artwork` | string | `photo` | `photo` or `vector` |
 | `language` | string | `auto` | `auto` follows Home Assistant |
 | `cavity_temp` / `cavity_target` | entity | — | cavity temperature and target |
