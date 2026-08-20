@@ -26,7 +26,7 @@
  * other looks already are. The card registers itself in the picker with a live preview.
  */
 
-const WEBER_CARD_VERSION = '1.8.0';
+const WEBER_CARD_VERSION = '1.8.1';
 
 // Cavity/probe colours: cold → warm → hot. Keyed on °C.
 const TEMP_STOPS = [
@@ -980,7 +980,14 @@ class WeberGrillCardEditor extends HTMLElement {
       this._built = true;
     }
     this._applyEditorStrings();
-    this._form.schema = editorSchema(this._t, this._config);
+    // Rebuilt only when it can actually differ. _render() runs on every keystroke
+    // (HA echoes config-changed back as setConfig), and handing ha-form a brand
+    // new schema array each time is churn it does not need.
+    const schemaKey = `${this._t.ed.variant}|${this._config.variant}`;
+    if (schemaKey !== this._schemaKey) {
+      this._schemaKey = schemaKey;
+      this._form.schema = editorSchema(this._t, this._config);
+    }
     // Show the effective values, not blanks: every control starts where the card
     // starts. DEFAULTS matters most for the switches — ha-selector-boolean draws
     // `undefined` as off, so an omitted `show_status: true` used to render as a
@@ -1018,47 +1025,80 @@ class WeberGrillCardEditor extends HTMLElement {
     set('add', T.addProbe);
   }
 
+  /**
+   * Probe rows are updated in place, never rebuilt from scratch.
+   *
+   * Typing in a probe field emits `config-changed`; HA answers by calling
+   * `setConfig` straight back on this editor (hui-element-editor: value setter →
+   * _setConfig → _updateConfigElement → configElement.setConfig). That lands here
+   * on every keystroke, and wiping `host.innerHTML` took the focused input with
+   * it — the field lost focus after a single character. So rows are created once
+   * and only their values change; the DOM is rebuilt only when a probe is added
+   * or removed, when nothing is focused anyway.
+   */
   _renderProbes() {
     const host = this.shadowRoot?.getElementById('probes');
     if (!host) return;
     const probes = this._config.probes || [];
-    host.innerHTML = '';
+    const rows = this._probeRows || (this._probeRows = []);
+
+    if (rows.length !== probes.length) {
+      host.innerHTML = '';
+      rows.length = 0;
+      probes.forEach((_, i) => rows.push(this._buildProbeRow(i, host)));
+    }
 
     probes.forEach((p, i) => {
-      const row = document.createElement('div');
-      row.className = 'probeRow';
-
-      const head = document.createElement('div');
-      head.className = 'probeHead';
-      head.innerHTML = `<b>${esc(p.name || `${this._t.probe} ${i + 1}`)}</b>`;
-      const del = document.createElement('button');
-      del.textContent = '✕';
-      del.title = this._t.ed.del;
-      del.addEventListener('click', () => {
-        this._config = { ...this._config, probes: probes.filter((_, n) => n !== i) };
-        this._emit();
-        this._renderProbes();
-      });
-      head.appendChild(del);
-      row.appendChild(head);
-
-      const form = document.createElement('ha-form');
+      const { form, label } = rows[i];
+      const data = { name: p.name || '', temp: p.temp || '', target: p.target || '' };
+      // Only touch ha-form when something really differs, so the value the user
+      // is halfway through typing is never written back over the caret.
+      const cur = form.data || {};
+      if (cur.name !== data.name || cur.temp !== data.temp || cur.target !== data.target) {
+        form.data = data;
+      }
       form.hass = this._hass;
-      form.data = { name: p.name || '', temp: p.temp || '', target: p.target || '' };
-      form.schema = PROBE_SCHEMA;
-      const PL = probeLabels(this._t);
-      form.computeLabel = (s) => PL[s.name] || s.name;
-      form.addEventListener('value-changed', (ev) => {
-        ev.stopPropagation();
-        const next = [...(this._config.probes || [])];
-        next[i] = { ...next[i], ...ev.detail.value };
-        this._config = { ...this._config, probes: next };
-        this._emit();
-        head.querySelector('b').textContent = next[i].name || `Sonda ${i + 1}`;
-      });
-      row.appendChild(form);
-      host.appendChild(row);
+      label.textContent = p.name || `${this._t.probe} ${i + 1}`;
     });
+  }
+
+  /** One row: a header with a delete button, and an ha-form for the three fields. */
+  _buildProbeRow(i, host) {
+    const row = document.createElement('div');
+    row.className = 'probeRow';
+
+    const head = document.createElement('div');
+    head.className = 'probeHead';
+    const label = document.createElement('b');
+    head.appendChild(label);
+    const del = document.createElement('button');
+    del.textContent = '✕';
+    del.title = this._t.ed.del;
+    del.addEventListener('click', () => {
+      const probes = (this._config.probes || []).filter((_, n) => n !== i);
+      this._config = { ...this._config, probes };
+      this._emit();
+      this._renderProbes();
+    });
+    head.appendChild(del);
+    row.appendChild(head);
+
+    const form = document.createElement('ha-form');
+    form.hass = this._hass;
+    form.schema = PROBE_SCHEMA;
+    const PL = probeLabels(this._t);
+    form.computeLabel = (s) => PL[s.name] || s.name;
+    form.addEventListener('value-changed', (ev) => {
+      ev.stopPropagation();
+      const next = [...(this._config.probes || [])];
+      next[i] = { ...next[i], ...ev.detail.value };
+      this._config = { ...this._config, probes: next };
+      this._emit();
+      label.textContent = next[i].name || `${this._t.probe} ${i + 1}`;
+    });
+    row.appendChild(form);
+    host.appendChild(row);
+    return { row, form, label };
   }
 }
 
