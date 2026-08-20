@@ -20,7 +20,7 @@
  * shortcuts. The card registers itself in the picker with a live preview.
  */
 
-const WEBER_CARD_VERSION = '1.5.0';
+const WEBER_CARD_VERSION = '1.6.0';
 
 // Cavity/probe colours: cold → warm → hot. Keyed on °C.
 const TEMP_STOPS = [
@@ -33,6 +33,85 @@ const TEMP_STOPS = [
 ];
 
 const VARIANTS = ['thermo', 'photo', 'vector', 'compact', 'ring', 'type'];
+
+// Card and editor strings. The language follows HA (hass.language) unless the
+// `language` option pins it; anything unknown falls back to English.
+const STRINGS = {
+  en: {
+    grill: 'Grill', probe: 'Probe', target: 'target', cavity: 'cavity',
+    inCavity: 'in cavity', offline: 'Grill unavailable',
+    wifi: 'WiFi', cloud: 'Cloud', bluetooth: 'Bluetooth', battery: 'Battery',
+    ed: {
+      title: 'Card title', name: 'Grill name', variant: 'Look', artwork: 'Artwork',
+      cavity_temp: 'Cavity temperature', cavity_target: 'Cavity target', battery: 'Battery',
+      wifi: 'WiFi', cloud: 'Cloud', bluetooth: 'Bluetooth', last_alarm: 'Last alert',
+      show_status: 'Status icons', animate: 'Smoke animation', alarm_minutes: 'Hide alert after (min)',
+      show_gauge: 'Thermostat (gauge)', show_artwork: 'Grill artwork',
+      show_glow: 'Cavity glow', show_probe_overlay: 'Probe on artwork',
+      glow_cold: 'Cold', glow_warm: 'Warming', glow_hot: 'Hot',
+      glow_warm_at: '“Warming” threshold (°C)', glow_hot_at: '“Hot” threshold (°C)',
+      ring_w: 'Thermostat width', img_scale: 'Grill size',
+      cavity_x: 'Cavity readout ↔', cavity_y: 'Cavity readout ↕', cavity_size: 'Cavity readout — size',
+      probe_x: 'Probe ↔', probe_y: 'Probe ↕', probe_size: 'Probe — size',
+      glow_x: 'Glow ↔', glow_y: 'Glow ↕', glow_w: 'Glow — width',
+      glow_h: 'Glow — height', glow_blur: 'Glow — blur',
+      glowSection: 'Glow colours', layoutSection: 'Placement (“Thermostat + grill” look)',
+      quick: 'Placement — quick actions', quickHint: 'Applies to the “Thermostat + grill” look.',
+      centerAll: 'Centre everything', centerCavity: 'Centre readout',
+      centerProbe: 'Centre probe', centerGlow: 'Centre glow',
+      resetLayout: 'Default placement', resetGlow: 'Default colours',
+      probes: 'Probes', probesHint: 'Pick entities from the list. An empty target hides the progress bar.',
+      addProbe: '+ Add probe', del: 'Remove probe',
+      pName: 'Name', pTemp: 'Probe temperature', pTarget: 'Probe target',
+      language: 'Language',
+      vThermo: 'Thermostat + grill', vPhoto: 'Grill photo', vVector: 'Vector artwork',
+      vCompact: 'Compact — number + grill', vRing: 'Gauge — progress to target',
+      vType: 'Typographic — number only', aPhoto: 'Photo', aVector: 'Vector',
+      langAuto: 'Follow Home Assistant',
+    },
+  },
+  pl: {
+    grill: 'Grill', probe: 'Sonda', target: 'cel', cavity: 'komora',
+    inCavity: 'w komorze', offline: 'Grill niedostępny',
+    wifi: 'WiFi', cloud: 'Chmura', bluetooth: 'Bluetooth', battery: 'Bateria',
+    ed: {
+      title: 'Tytuł karty', name: 'Nazwa grilla', variant: 'Wygląd', artwork: 'Grafika',
+      cavity_temp: 'Temperatura komory', cavity_target: 'Cel komory', battery: 'Bateria',
+      wifi: 'WiFi', cloud: 'Chmura', bluetooth: 'Bluetooth', last_alarm: 'Ostatni alarm',
+      show_status: 'Ikony stanu', animate: 'Animacja dymu', alarm_minutes: 'Ukryj alarm po (min)',
+      show_gauge: 'Termostat (pierścień)', show_artwork: 'Zdjęcie grilla',
+      show_glow: 'Poświata komory', show_probe_overlay: 'Sonda na grafice',
+      glow_cold: 'Zimny', glow_warm: 'Rozgrzewanie', glow_hot: 'Gorący',
+      glow_warm_at: 'Próg „rozgrzewanie” (°C)', glow_hot_at: 'Próg „gorący” (°C)',
+      ring_w: 'Szerokość termostatu', img_scale: 'Wielkość grilla',
+      cavity_x: 'Odczyt komory ↔', cavity_y: 'Odczyt komory ↕', cavity_size: 'Odczyt komory — wielkość',
+      probe_x: 'Sonda ↔', probe_y: 'Sonda ↕', probe_size: 'Sonda — wielkość',
+      glow_x: 'Poświata ↔', glow_y: 'Poświata ↕', glow_w: 'Poświata — szerokość',
+      glow_h: 'Poświata — wysokość', glow_blur: 'Poświata — rozmycie',
+      glowSection: 'Kolory poświaty', layoutSection: 'Rozmieszczenie (wariant „Termostat + grill”)',
+      quick: 'Rozmieszczenie — szybkie akcje', quickHint: 'Działa na wariant „Termostat + grill”.',
+      centerAll: 'Wyśrodkuj wszystko', centerCavity: 'Wyśrodkuj odczyt',
+      centerProbe: 'Wyśrodkuj sondę', centerGlow: 'Wyśrodkuj poświatę',
+      resetLayout: 'Domyślne rozmieszczenie', resetGlow: 'Domyślne kolory',
+      probes: 'Sondy', probesHint: 'Wybierz encje z listy. Puste pole celu ukrywa pasek postępu.',
+      addProbe: '+ Dodaj sondę', del: 'Usuń sondę',
+      pName: 'Nazwa', pTemp: 'Temperatura sondy', pTarget: 'Cel sondy',
+      language: 'Język',
+      vThermo: 'Termostat + grill', vPhoto: 'Zdjęcie grilla', vVector: 'Grafika wektorowa',
+      vCompact: 'Kompakt — liczba + grill', vRing: 'Pierścień — wskaźnik celu',
+      vType: 'Typograficzny — sama liczba', aPhoto: 'Zdjęcie', aVector: 'Wektor',
+      langAuto: 'Zgodnie z Home Assistant',
+    },
+  },
+};
+
+/** Strings for a config + hass pair; `language: auto` follows HA. */
+function t(cfg, hass) {
+  const pick = (cfg && cfg.language && cfg.language !== 'auto')
+    ? cfg.language
+    : (hass && hass.language) || 'en';
+  return STRINGS[String(pick).slice(0, 2).toLowerCase()] || STRINGS.en;
+}
 
 // Cavity glow: three named states rather than one ramp — cold blue, warming
 // yellow, hot red. Colours and the two thresholds are editable in the GUI.
@@ -50,17 +129,18 @@ const GLOW_DEFAULTS = {
 const THERMO_LAYOUT = {
   ring_w: 44,        // width of the left gauge column, % of card
   img_scale: 100,    // artwork width, % of its column
-  cavity_x: 50,      // cavity readout centre, % of artwork width
-  cavity_y: 34,      // cavity readout, % of artwork height
-  cavity_size: 100,  // cavity readout scale, %
-  probe_x: 88,       // probe chip centre, % of artwork width
-  probe_y: 62,
+  cavity_x: 58,      // right of the Weber badge, which sits left of lid centre
+  cavity_y: 13,      // on the lid — below it sits the control panel, where the
+                     // number collided with the knobs and the Spirit badge
+  cavity_size: 85,
+  probe_x: 87,       // probe chip, clear of the artwork's right edge
+  probe_y: 46,
   probe_size: 100,
-  glow_x: 50,        // glow centre
-  glow_y: 30,        // glow centre, % height (seam sits at 26%)
-  glow_w: 72,        // glow width, % of artwork
-  glow_h: 20,        // glow height, % of artwork
-  glow_blur: 10,     // px
+  glow_x: 50,
+  glow_y: 24,        // centred on the cook box, seam at 26%
+  glow_w: 58,
+  glow_h: 26,
+  glow_blur: 16,
 };
 
 // Artwork sits next to the card file, so the base is derived from where this
@@ -237,6 +317,8 @@ class WeberGrillCard extends HTMLElement {
     return 4 + Math.ceil((this._config?.probes?.length || 0) / 2);
   }
 
+  get _t() { return t(this._config, this._hass); }
+
   // -- rendering --------------------------------------------------------
   _render() {
     if (!this._config) return;
@@ -257,13 +339,13 @@ class WeberGrillCard extends HTMLElement {
       ${c.title ? `<h1 class="card-header">${esc(c.title)}</h1>` : ''}
       <div class="wrap${online ? '' : ' offline'}">
         <div class="hd">
-          <span class="nm">${esc(c.name || 'Grill')}</span>
+          <span class="nm">${esc(c.name || this._t.grill)}</span>
           ${c.show_status ? this._chips(battery) : ''}
         </div>
         ${this._alarmBanner()}
         ${this._hero(cavity, target)}
-        ${this._probes()}
-        ${online ? '' : '<div class="offline-note">Grill niedostępny</div>'}
+        ${this._skipProbeList() ? '' : this._probes()}
+        ${online ? '' : `<div class="offline-note">${esc(this._t.offline)}</div>`}
       </div>`;
 
     card.querySelectorAll('[data-entity]').forEach((el) => {
@@ -274,6 +356,12 @@ class WeberGrillCard extends HTMLElement {
         this.dispatchEvent(e);
       });
     });
+  }
+
+  /** In thermo the probe overlay replaces the list, so it is not shown twice. */
+  _skipProbeList() {
+    const c = this._config;
+    return c.variant === 'thermo' && c.show_artwork !== false && c.show_probe_overlay !== false;
   }
 
   /** Dispatch on the configured variant. */
@@ -305,7 +393,7 @@ class WeberGrillCard extends HTMLElement {
       <div class="smoke2" style="opacity:${smoke}"><i></i><i></i><i></i></div>
       <div class="read">
         <span class="v" style="color:${color}">${cavity === null ? '--' : Math.round(cavity)}<sup>${esc(this._config.unit)}</sup></span>
-        ${target === null ? '' : `<span class="t">cel ${Math.round(target)} ${esc(this._config.unit)}</span>`}
+        ${target === null ? '' : `<span class="t">${esc(this._t.target)} ${Math.round(target)} ${esc(this._config.unit)}</span>`}
       </div>
     </div>`;
   }
@@ -314,7 +402,7 @@ class WeberGrillCard extends HTMLElement {
     return `<div class="hero compact" data-entity="${esc(this._config.cavity_temp)}">
       <div>
         <div class="big sm" style="color:${color}">${cavity === null ? '--' : Math.round(cavity)}<sup>${esc(this._config.unit)}</sup></div>
-        <div class="sub"><span>komora</span>${target === null ? '' : `<span>cel ${Math.round(target)} ${esc(this._config.unit)}</span>`}</div>
+        <div class="sub"><span>${esc(this._t.cavity)}</span>${target === null ? '' : `<span>${esc(this._t.target)} ${Math.round(target)} ${esc(this._config.unit)}</span>`}</div>
         ${this._numTrack(pct, color)}
       </div>
       <div class="art">
@@ -348,9 +436,9 @@ class WeberGrillCard extends HTMLElement {
 
     const probeChip = (!probe || c.show_probe_overlay === false) ? '' : `
       <div class="tProbe" style="left:${L.probe_x}%;top:${L.probe_y}%;font-size:${L.probe_size}%">
-        <span class="lbl">${esc(probe.name || 'Sonda')}</span>
+        <span class="lbl">${esc(probe.name || this._t.probe)}</span>
         <span class="val" style="color:${tempColor(pt)}">${pt === null ? '--' : Math.round(pt)}<i>${esc(this._config.unit)}</i></span>
-        ${ptgt === null ? '' : `<span class="tgt">cel ${Math.round(ptgt)}${esc(this._config.unit)}</span>`}
+        ${ptgt === null ? '' : `<span class="tgt">${esc(this._t.target)} ${Math.round(ptgt)}${esc(this._config.unit)}</span>`}
       </div>`;
 
     const artHtml = !art ? '' : `
@@ -365,7 +453,7 @@ class WeberGrillCard extends HTMLElement {
             background: radial-gradient(ellipse at center, ${glow} 0%, ${glow}00 70%);"></div>`}
           <div class="tCavity" style="left:${L.cavity_x}%;top:${L.cavity_y}%;font-size:${L.cavity_size}%">
             <span class="val" style="color:${color}">${cavity === null ? '--' : Math.round(cavity)}<i>${esc(c.unit)}</i></span>
-            ${target === null ? '' : `<span class="tgt">cel ${Math.round(target)}${esc(c.unit)}</span>`}
+            ${target === null ? '' : `<span class="tgt">${esc(this._t.target)} ${Math.round(target)}${esc(c.unit)}</span>`}
           </div>
           ${probeChip}
         </div>
@@ -397,8 +485,8 @@ class WeberGrillCard extends HTMLElement {
       <line x1="100" y1="14" x2="100" y2="30" stroke="var(--primary-text-color,#e8eaee)" stroke-width="3"
             stroke-linecap="round" opacity=".8" transform="rotate(${(270 * p / 100).toFixed(1)} 100 100)"/>
       <text class="ringVal" x="100" y="103" text-anchor="middle" fill="${color}">${cavity === null ? '--' : Math.round(cavity)}</text>
-      <text class="ringLbl" x="100" y="122" text-anchor="middle">${esc(this._config.unit)} w komorze</text>
-      ${target === null ? '' : `<text class="ringTgt" x="100" y="146" text-anchor="middle">cel ${Math.round(target)}${esc(this._config.unit)}</text>`}
+      <text class="ringLbl" x="100" y="122" text-anchor="middle">${esc(this._config.unit)} ${esc(this._t.inCavity)}</text>
+      ${target === null ? '' : `<text class="ringTgt" x="100" y="146" text-anchor="middle">${esc(this._t.target)} ${Math.round(target)}${esc(this._config.unit)}</text>`}
     </svg>`;
   }
 
@@ -421,8 +509,8 @@ class WeberGrillCard extends HTMLElement {
         <line x1="100" y1="14" x2="100" y2="30" stroke="var(--primary-text-color,#e8eaee)" stroke-width="3"
               stroke-linecap="round" opacity=".8" transform="rotate(${(270 * p / 100).toFixed(1)} 100 100)"/>
         <text class="ringVal" x="100" y="103" text-anchor="middle" fill="${color}">${cavity === null ? '--' : Math.round(cavity)}</text>
-        <text class="ringLbl" x="100" y="122" text-anchor="middle">${esc(this._config.unit)} w komorze</text>
-        ${target === null ? '' : `<text class="ringTgt" x="100" y="146" text-anchor="middle">cel ${Math.round(target)}${esc(this._config.unit)}</text>`}
+        <text class="ringLbl" x="100" y="122" text-anchor="middle">${esc(this._config.unit)} ${esc(this._t.inCavity)}</text>
+        ${target === null ? '' : `<text class="ringTgt" x="100" y="146" text-anchor="middle">${esc(this._t.target)} ${Math.round(target)}${esc(this._config.unit)}</text>`}
       </svg>
     </div>`;
   }
@@ -430,7 +518,7 @@ class WeberGrillCard extends HTMLElement {
   _heroType(cavity, target, color, pct) {
     return `<div class="hero type" data-entity="${esc(this._config.cavity_temp)}">
       <div class="big" style="color:${color}">${cavity === null ? '--' : Math.round(cavity)}<sup>${esc(this._config.unit)}</sup></div>
-      <div class="sub"><span>komora</span>${target === null ? '' : `<span>cel ${Math.round(target)} ${esc(this._config.unit)}</span>`}</div>
+      <div class="sub"><span>${esc(this._t.cavity)}</span>${target === null ? '' : `<span>${esc(this._t.target)} ${Math.round(target)} ${esc(this._config.unit)}</span>`}</div>
       ${this._numTrack(pct, color)}
     </div>`;
   }
@@ -440,14 +528,14 @@ class WeberGrillCard extends HTMLElement {
     const chip = (on, icon, label, entity) => (on === null ? ''
       : `<span class="chip ${on ? 'on' : 'off'}" data-entity="${esc(entity)}" title="${esc(label)}"><ha-icon icon="${icon}"></ha-icon></span>`);
     const parts = [
-      chip(isOn(this._hass, c.wifi), 'mdi:wifi', 'WiFi', c.wifi),
-      chip(isOn(this._hass, c.cloud), 'mdi:cloud-outline', 'Chmura', c.cloud),
-      chip(isOn(this._hass, c.bluetooth), 'mdi:bluetooth', 'Bluetooth', c.bluetooth),
+      chip(isOn(this._hass, c.wifi), 'mdi:wifi', this._t.wifi, c.wifi),
+      chip(isOn(this._hass, c.cloud), 'mdi:cloud-outline', this._t.cloud, c.cloud),
+      chip(isOn(this._hass, c.bluetooth), 'mdi:bluetooth', this._t.bluetooth, c.bluetooth),
     ];
     if (battery !== null) {
       const icon = battery > 90 ? 'mdi:battery'
         : battery > 10 ? `mdi:battery-${Math.round(battery / 10) * 10}` : 'mdi:battery-alert';
-      parts.push(`<span class="chip batt ${battery <= 15 ? 'low' : ''}" data-entity="${esc(c.battery)}" title="Bateria"><ha-icon icon="${icon}"></ha-icon><b>${Math.round(battery)}%</b></span>`);
+      parts.push(`<span class="chip batt ${battery <= 15 ? 'low' : ''}" data-entity="${esc(c.battery)}" title="${esc(this._t.battery)}"><ha-icon icon="${icon}"></ha-icon><b>${Math.round(battery)}%</b></span>`);
     }
     const html = parts.filter(Boolean).join('');
     return html ? `<span class="chips">${html}</span>` : '';
@@ -477,7 +565,7 @@ class WeberGrillCard extends HTMLElement {
       const col = tempColor(t);
       return `<div class="pr${pct !== null && pct >= 100 ? ' hit' : ''}" data-entity="${esc(p.temp)}">
         <div class="prtop">
-          <span class="prname"><ha-icon icon="mdi:thermometer-probe"></ha-icon>${esc(p.name || `Sonda ${i + 1}`)}</span>
+          <span class="prname"><ha-icon icon="mdi:thermometer-probe"></ha-icon>${esc(p.name || `${this._t.probe} ${i + 1}`)}</span>
           <span class="prval" style="color:${col}">${t === null ? '--' : Math.round(t)}${tgt === null ? '' : `<u>/ ${Math.round(tgt)} ${esc(this._config.unit)}</u>`}</span>
         </div>
         ${pct === null ? '' : `<div class="prbar"><i style="width:${pct.toFixed(1)}%;background:${col}"></i></div>`}
@@ -557,9 +645,10 @@ class WeberGrillCard extends HTMLElement {
       .tCavity .val { display: block; font-size: clamp(20px, 15cqw, 40px); font-weight: 700;
                       letter-spacing: -.03em; font-variant-numeric: tabular-nums; }
       .tCavity .val i { font-size: .45em; font-style: normal; font-weight: 600; }
-      .tCavity .tgt { display: block; font-size: clamp(9px, 5cqw, 12px); color: #dfe4ec; opacity: .85; margin-top: 2px; }
-      .tProbe { background: rgba(12,16,22,.72); border-radius: 9px; padding: 4px 7px;
-                backdrop-filter: blur(2px); text-shadow: none; }
+      .tCavity .tgt { display: block; font-size: clamp(9px, 5cqw, 12px); color: #eef2f8;
+                      opacity: .95; margin-top: 2px; white-space: nowrap; }
+      .tProbe { background: rgba(12,16,22,.78); border-radius: 9px; padding: 4px 8px;
+                backdrop-filter: blur(2px); text-shadow: none; white-space: nowrap; }
       .tProbe .lbl { display: block; font-size: clamp(8px, 4cqw, 10px); color: #9aa3b2; }
       .tProbe .val { display: block; font-size: clamp(13px, 8cqw, 20px); font-weight: 650;
                      font-variant-numeric: tabular-nums; }
@@ -607,23 +696,9 @@ class WeberGrillCard extends HTMLElement {
 // ---------------------------------------------------------------------------
 // GUI editor — native ha-form, so entity fields get real HA pickers
 // ---------------------------------------------------------------------------
-const EDITOR_LABELS = {
-  title: 'Tytuł karty', name: 'Nazwa grilla', variant: 'Wygląd', artwork: 'Grafika',
-  cavity_temp: 'Temperatura komory', cavity_target: 'Cel komory', battery: 'Bateria',
-  wifi: 'WiFi', cloud: 'Chmura', bluetooth: 'Bluetooth', last_alarm: 'Ostatni alarm',
-  show_status: 'Ikony stanu', animate: 'Animacja dymu', alarm_minutes: 'Ukryj alarm po (min)',
-  show_gauge: 'Termostat (pierścień)', show_artwork: 'Zdjęcie grilla',
-  show_glow: 'Poświata komory', show_probe_overlay: 'Sonda na grafice',
-  glow_cold: 'Zimny', glow_warm: 'Rozgrzewanie', glow_hot: 'Gorący',
-  glow_warm_at: 'Próg „rozgrzewanie” (°C)', glow_hot_at: 'Próg „gorący” (°C)',
-  ring_w: 'Szerokość termostatu', img_scale: 'Wielkość grilla',
-  cavity_x: 'Odczyt komory ↔', cavity_y: 'Odczyt komory ↕', cavity_size: 'Odczyt komory — wielkość',
-  probe_x: 'Sonda ↔', probe_y: 'Sonda ↕', probe_size: 'Sonda — wielkość',
-  glow_x: 'Poświata ↔', glow_y: 'Poświata ↕', glow_w: 'Poświata — szerokość',
-  glow_h: 'Poświata — wysokość', glow_blur: 'Poświata — rozmycie',
-};
 
-const PROBE_LABELS = { name: 'Nazwa', temp: 'Temperatura sondy', target: 'Cel sondy' };
+
+const probeLabels = (T) => ({ name: T.ed.pName, temp: T.ed.pTemp, target: T.ed.pTarget });
 const PROBE_SCHEMA = [
   { name: 'name', selector: { text: {} } },
   {
@@ -648,8 +723,25 @@ const layoutSchema = () => Object.entries(LAYOUT_RANGES).map(([name, [min, max, 
   selector: { number: { min, max, step: 1, mode: 'slider', unit_of_measurement: unit } },
 }));
 
-const EDITOR_SCHEMA = [
-  { name: 'name', selector: { text: {} } },
+const editorSchema = (T) => [
+  {
+    name: '', type: 'grid', schema: [
+      { name: 'name', selector: { text: {} } },
+      {
+        name: 'language',
+        selector: {
+          select: {
+            mode: 'dropdown',
+            options: [
+              { value: 'auto', label: T.ed.langAuto },
+              { value: 'pl', label: 'Polski' },
+              { value: 'en', label: 'English' },
+            ],
+          },
+        },
+      },
+    ],
+  },
   { name: 'title', selector: { text: {} } },
   {
     name: 'variant',
@@ -657,12 +749,12 @@ const EDITOR_SCHEMA = [
       select: {
         mode: 'dropdown',
         options: [
-          { value: 'thermo', label: 'Termostat + grill' },
-          { value: 'photo', label: 'Zdjęcie grilla' },
-          { value: 'vector', label: 'Grafika wektorowa' },
-          { value: 'compact', label: 'Kompakt — liczba + grill obok' },
-          { value: 'ring', label: 'Pierścień — wskaźnik celu' },
-          { value: 'type', label: 'Typograficzny — sama liczba' },
+          { value: 'thermo', label: T.ed.vThermo },
+          { value: 'photo', label: T.ed.vPhoto },
+          { value: 'vector', label: T.ed.vVector },
+          { value: 'compact', label: T.ed.vCompact },
+          { value: 'ring', label: T.ed.vRing },
+          { value: 'type', label: T.ed.vType },
         ],
       },
     },
@@ -673,8 +765,8 @@ const EDITOR_SCHEMA = [
       select: {
         mode: 'dropdown',
         options: [
-          { value: 'photo', label: 'Zdjęcie' },
-          { value: 'vector', label: 'Wektor' },
+          { value: 'photo', label: T.ed.aPhoto },
+          { value: 'vector', label: T.ed.aVector },
         ],
       },
     },
@@ -704,7 +796,7 @@ const EDITOR_SCHEMA = [
   {
     // Empty name keeps these flat in the config; `layout` below is genuinely
     // nested, which is why that one carries its name.
-    name: '', type: 'expandable', title: 'Kolory poświaty',
+    name: '', type: 'expandable', title: T.ed.glowSection,
     schema: [
       {
         name: '', type: 'grid', schema: [
@@ -722,7 +814,7 @@ const EDITOR_SCHEMA = [
     ],
   },
   {
-    name: 'layout', type: 'expandable', title: 'Rozmieszczenie (wariant „Termostat + grill”)',
+    name: 'layout', type: 'expandable', title: T.ed.layoutSection,
     schema: layoutSchema(),
   },
 ];
@@ -736,6 +828,8 @@ class WeberGrillCardEditor extends HTMLElement {
     this._built = false;
   }
 
+  get _t() { return t(this._config, this._hass); }
+
   setConfig(config) {
     this._config = { ...config };
     this._render();
@@ -744,6 +838,7 @@ class WeberGrillCardEditor extends HTMLElement {
   set hass(hass) {
     this._hass = hass;
     if (this._form) this._form.hass = hass;
+    if (this._built) this._render();
   }
 
   _emit() {
@@ -777,25 +872,25 @@ class WeberGrillCardEditor extends HTMLElement {
         </style>
         <div id="form"></div>
         <div class="sec">
-          <h4>Rozmieszczenie — szybkie akcje</h4>
-          <div class="hint">Działa na wariant „Termostat + grill”.</div>
+          <h4 id="l-quick"></h4>
+          <div class="hint" id="l-quickHint"></div>
           <div class="tools">
-            <button id="center-all">Wyśrodkuj wszystko</button>
-            <button id="center-cavity">Wyśrodkuj odczyt</button>
-            <button id="center-probe">Wyśrodkuj sondę</button>
-            <button id="center-glow">Wyśrodkuj poświatę</button>
-            <button id="reset-layout">Domyślne rozmieszczenie</button>
-            <button id="reset-glow">Domyślne kolory</button>
+            <button id="center-all"></button>
+            <button id="center-cavity"></button>
+            <button id="center-probe"></button>
+            <button id="center-glow"></button>
+            <button id="reset-layout"></button>
+            <button id="reset-glow"></button>
           </div>
         </div>
         <div class="sec">
-          <h4>Sondy</h4>
-          <div class="hint">Wybierz encje z listy. Puste pole celu ukrywa pasek postępu.</div>
+          <h4 id="l-probes"></h4>
+          <div class="hint" id="l-probesHint"></div>
           <div id="probes"></div>
-          <button class="add" id="add">+ Dodaj sondę</button>
+          <button class="add" id="add"></button>
         </div>`;
       this._form = document.createElement('ha-form');
-      this._form.computeLabel = (s) => EDITOR_LABELS[s.name] || s.name;
+      this._form.computeLabel = (s) => this._t.ed[s.name] || s.name;
       this._form.addEventListener('value-changed', (ev) => {
         ev.stopPropagation();
         this._config = { ...this._config, ...ev.detail.value };
@@ -804,7 +899,7 @@ class WeberGrillCardEditor extends HTMLElement {
       this.shadowRoot.getElementById('form').appendChild(this._form);
       this.shadowRoot.getElementById('add').addEventListener('click', () => {
         const probes = [...(this._config.probes || [])];
-        probes.push({ name: `Sonda ${probes.length + 1}`, temp: '', target: '' });
+        probes.push({ name: `${this._t.probe} ${probes.length + 1}`, temp: '', target: '' });
         this._config = { ...this._config, probes };
         this._emit();
         this._renderProbes();
@@ -837,7 +932,8 @@ class WeberGrillCardEditor extends HTMLElement {
       });
       this._built = true;
     }
-    this._form.schema = EDITOR_SCHEMA;
+    this._applyEditorStrings();
+    this._form.schema = editorSchema(this._t);
     // Show the effective values, not blanks: sliders start where the card starts.
     this._form.data = {
       ...GLOW_DEFAULTS,
@@ -852,6 +948,21 @@ class WeberGrillCardEditor extends HTMLElement {
    * One ha-form per probe, so its temperature and target get real entity
    * pickers instead of a free-text field the user has to type an id into.
    */
+  /** Fill the editor's static chrome from the string table. */
+  _applyEditorStrings() {
+    const T = this._t.ed;
+    const set = (id, txt) => {
+      const el = this.shadowRoot.getElementById(id);
+      if (el) el.textContent = txt;
+    };
+    set('l-quick', T.quick); set('l-quickHint', T.quickHint);
+    set('l-probes', T.probes); set('l-probesHint', T.probesHint);
+    set('center-all', T.centerAll); set('center-cavity', T.centerCavity);
+    set('center-probe', T.centerProbe); set('center-glow', T.centerGlow);
+    set('reset-layout', T.resetLayout); set('reset-glow', T.resetGlow);
+    set('add', T.addProbe);
+  }
+
   _renderProbes() {
     const host = this.shadowRoot?.getElementById('probes');
     if (!host) return;
@@ -864,10 +975,10 @@ class WeberGrillCardEditor extends HTMLElement {
 
       const head = document.createElement('div');
       head.className = 'probeHead';
-      head.innerHTML = `<b>${esc(p.name || `Sonda ${i + 1}`)}</b>`;
+      head.innerHTML = `<b>${esc(p.name || `${this._t.probe} ${i + 1}`)}</b>`;
       const del = document.createElement('button');
       del.textContent = '✕';
-      del.title = 'Usuń sondę';
+      del.title = this._t.ed.del;
       del.addEventListener('click', () => {
         this._config = { ...this._config, probes: probes.filter((_, n) => n !== i) };
         this._emit();
@@ -880,7 +991,8 @@ class WeberGrillCardEditor extends HTMLElement {
       form.hass = this._hass;
       form.data = { name: p.name || '', temp: p.temp || '', target: p.target || '' };
       form.schema = PROBE_SCHEMA;
-      form.computeLabel = (s) => PROBE_LABELS[s.name] || s.name;
+      const PL = probeLabels(this._t);
+      form.computeLabel = (s) => PL[s.name] || s.name;
       form.addEventListener('value-changed', (ev) => {
         ev.stopPropagation();
         const next = [...(this._config.probes || [])];
