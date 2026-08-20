@@ -17,7 +17,7 @@
  * the card picker with a live preview.
  */
 
-const WEBER_CARD_VERSION = '1.2.0';
+const WEBER_CARD_VERSION = '1.3.0';
 
 // Cavity/probe colours: cold → warm → hot. Keyed on °C.
 const TEMP_STOPS = [
@@ -29,7 +29,36 @@ const TEMP_STOPS = [
   [350, '#b02020'],
 ];
 
-const VARIANTS = ['photo', 'vector', 'compact', 'ring', 'type'];
+const VARIANTS = ['thermo', 'photo', 'vector', 'compact', 'ring', 'type'];
+
+// Cavity glow: explicitly three states rather than a smooth ramp — cold reads
+// blue, warming yellow, hot red, which is what the grill is asked to say.
+const GLOW_STOPS = [
+  [20, '#3d7fd6'],   // cold
+  [60, '#4aa8c9'],
+  [110, '#f0c23c'],  // warming
+  [180, '#e8722a'],
+  [230, '#d93a2b'],  // hot
+];
+
+// Layout of the thermo variant, in percent of the artwork box. Defaults were
+// measured on the supplied images (lid x 22–78%, y 0–25%, seam at 26%); every
+// value is overridable from YAML so the position can be tuned without a rebuild.
+const THERMO_LAYOUT = {
+  ring_w: 44,        // width of the left gauge column, % of card
+  img_scale: 100,    // artwork width, % of its column
+  cavity_x: 50,      // cavity readout centre, % of artwork width
+  cavity_y: 34,      // cavity readout, % of artwork height
+  cavity_size: 100,  // cavity readout scale, %
+  probe_x: 88,       // probe chip centre, % of artwork width
+  probe_y: 62,
+  probe_size: 100,
+  glow_x: 50,        // glow centre
+  glow_y: 30,        // glow centre, % height (seam sits at 26%)
+  glow_w: 72,        // glow width, % of artwork
+  glow_h: 20,        // glow height, % of artwork
+  glow_blur: 10,     // px
+};
 
 // Artwork lives next to the card; override with `image_base` if deployed elsewhere.
 const DEFAULT_IMAGE_BASE = '/local/weber-grill-card/images/';
@@ -42,7 +71,7 @@ const LID_SEAM = 26;
 const DEFAULTS = {
   title: '',
   name: 'Grill',
-  variant: 'photo',
+  variant: 'thermo',
   artwork: 'photo',
   show_status: true,
   animate: true,
@@ -56,6 +85,24 @@ function mixHex(a, b, f) {
   const p = (s) => [1, 3, 5].map((i) => parseInt(s.substr(i, 2), 16));
   const [x, y] = [p(a), p(b)];
   return `rgb(${x.map((v, i) => Math.round(v + (y[i] - v) * f)).join(',')})`;
+}
+
+function rampColor(stops, t) {
+  if (t === null || t === undefined || Number.isNaN(t)) return stops[0][1];
+  if (t <= stops[0][0]) return stops[0][1];
+  const last = stops[stops.length - 1];
+  if (t >= last[0]) return last[1];
+  for (let i = 0; i < stops.length - 1; i++) {
+    const [t0, c0] = stops[i];
+    const [t1, c1] = stops[i + 1];
+    if (t >= t0 && t <= t1) return mixHex(c0, c1, (t - t0) / (t1 - t0));
+  }
+  return last[1];
+}
+
+/** Colour of the glow around the cook box: blue → yellow → red. */
+function glowColor(t) {
+  return rampColor(GLOW_STOPS, t);
 }
 
 function tempColor(t) {
@@ -116,7 +163,7 @@ class WeberGrillCard extends HTMLElement {
 
   /** Pre-fill from existing grill entities so picking the card yields a working one. */
   static getStubConfig(hass) {
-    const cfg = { type: 'custom:weber-grill-card', name: 'Grill', variant: 'photo', probes: [] };
+    const cfg = { type: 'custom:weber-grill-card', name: 'Grill', variant: 'thermo', probes: [] };
     if (!hass || !hass.states) return cfg;
 
     // Scoped to grill-looking entities: an unrelated wifi or battery sensor must
@@ -207,6 +254,7 @@ class WeberGrillCard extends HTMLElement {
     const heat = cavity === null ? 0 : clamp((cavity - 45) / 175, 0, 1);
     const pct = (cavity !== null && target) ? clamp((cavity / target) * 100, 0, 100) : null;
     switch (this._config.variant) {
+      case 'thermo': return this._heroThermo(cavity, target, color, pct);
       case 'ring': return this._heroRing(cavity, target, color, pct);
       case 'type': return this._heroType(cavity, target, color, pct);
       case 'compact': return this._heroCompact(cavity, target, color, pct, heat);
@@ -251,6 +299,68 @@ class WeberGrillCard extends HTMLElement {
   _numTrack(pct, color) {
     if (pct === null) return '';
     return `<div class="track"><i style="width:${pct.toFixed(1)}%;background:${color}"></i></div>`;
+  }
+
+  /** Gauge on the left, artwork on the right, readings placed over the cook box. */
+  _heroThermo(cavity, target, color, pct) {
+    const L = { ...THERMO_LAYOUT, ...(this._config.layout || {}) };
+    const glow = glowColor(cavity);
+    const lit = cavity === null ? 0 : clamp((cavity - 15) / 60, 0.18, 1);
+    const probe = (this._config.probes || [])[0];
+    const pt = numState(this._hass, probe?.temp);
+    const ptgt = numState(this._hass, probe?.target);
+
+    const probeChip = !probe ? '' : `
+      <div class="tProbe" style="left:${L.probe_x}%;top:${L.probe_y}%;font-size:${L.probe_size}%">
+        <span class="lbl">${esc(probe.name || 'Sonda')}</span>
+        <span class="val" style="color:${tempColor(pt)}">${pt === null ? '--' : Math.round(pt)}<i>${esc(this._config.unit)}</i></span>
+        ${ptgt === null ? '' : `<span class="tgt">cel ${Math.round(ptgt)}${esc(this._config.unit)}</span>`}
+      </div>`;
+
+    return `<div class="hero thermo" data-entity="${esc(this._config.cavity_temp)}"
+                 style="grid-template-columns:${L.ring_w}% 1fr">
+      <div class="tGauge">${this._gaugeSvg(cavity, target, color, pct)}</div>
+      <div class="tArt">
+        <div class="tArtInner" style="width:${L.img_scale}%">
+          <img src="${esc(this._imgSrc(this._config.artwork))}" alt="Weber Spirit" loading="lazy">
+          <div class="tGlow" style="
+            left:${L.glow_x}%; top:${L.glow_y}%;
+            width:${L.glow_w}%; height:${L.glow_h}%;
+            filter: blur(${L.glow_blur}px);
+            opacity:${lit.toFixed(2)};
+            background: radial-gradient(ellipse at center, ${glow} 0%, ${glow}00 70%);"></div>
+          <div class="tCavity" style="left:${L.cavity_x}%;top:${L.cavity_y}%;font-size:${L.cavity_size}%">
+            <span class="val" style="color:${color}">${cavity === null ? '--' : Math.round(cavity)}<i>${esc(this._config.unit)}</i></span>
+            ${target === null ? '' : `<span class="tgt">cel ${Math.round(target)}${esc(this._config.unit)}</span>`}
+          </div>
+          ${probeChip}
+        </div>
+      </div>
+    </div>`;
+  }
+
+  /** Shared 270° gauge body, used by the ring and thermo variants. */
+  _gaugeSvg(cavity, target, color, pct) {
+    const ARC = 367;
+    const p = pct === null ? 0 : pct;
+    return `<svg viewBox="0 0 200 200" role="img" aria-label="Wskaźnik temperatury komory">
+      <defs>
+        <linearGradient id="wgArc" x1="0" y1="1" x2="1" y2="0">
+          <stop offset="0" stop-color="#4a90d9"/><stop offset=".5" stop-color="#e0a33a"/>
+          <stop offset="1" stop-color="#d1442f"/>
+        </linearGradient>
+      </defs>
+      <circle cx="100" cy="100" r="78" fill="none" stroke="var(--divider-color,#232a36)" stroke-width="13"
+              stroke-dasharray="${ARC} 490" stroke-linecap="round" transform="rotate(135 100 100)"/>
+      <circle cx="100" cy="100" r="78" fill="none" stroke="url(#wgArc)" stroke-width="13"
+              stroke-dasharray="${(ARC * p / 100).toFixed(1)} 490" stroke-linecap="round"
+              transform="rotate(135 100 100)"/>
+      <line x1="100" y1="14" x2="100" y2="30" stroke="var(--primary-text-color,#e8eaee)" stroke-width="3"
+            stroke-linecap="round" opacity=".8" transform="rotate(${(270 * p / 100).toFixed(1)} 100 100)"/>
+      <text class="ringVal" x="100" y="103" text-anchor="middle" fill="${color}">${cavity === null ? '--' : Math.round(cavity)}</text>
+      <text class="ringLbl" x="100" y="122" text-anchor="middle">${esc(this._config.unit)} w komorze</text>
+      ${target === null ? '' : `<text class="ringTgt" x="100" y="146" text-anchor="middle">cel ${Math.round(target)}${esc(this._config.unit)}</text>`}
+    </svg>`;
   }
 
   _heroRing(cavity, target, color, pct) {
@@ -392,6 +502,31 @@ class WeberGrillCard extends HTMLElement {
       .hero.compact .art { position: relative; }
       .hero.compact .art img { width: 100%; height: auto; display: block; }
 
+      /* Thermo: gauge left, artwork right, readings pinned over the cook box.
+         Every position comes from the layout option so it is tunable from YAML. */
+      .hero.thermo { display: grid; gap: 8px; align-items: center; }
+      .hero.thermo .tGauge svg { width: 100%; height: auto; display: block; }
+      .hero.thermo .tArt { display: flex; justify-content: center; }
+      .hero.thermo .tArtInner { position: relative; container-type: inline-size; }
+      .hero.thermo img { width: 100%; height: auto; display: block; }
+      .tGlow { position: absolute; transform: translate(-50%, -50%); border-radius: 50%;
+               pointer-events: none; mix-blend-mode: screen;
+               transition: opacity .8s ease, background .8s ease; }
+      .tCavity, .tProbe { position: absolute; transform: translate(-50%, -50%);
+                          pointer-events: none; text-align: center; line-height: 1.05;
+                          text-shadow: 0 1px 4px rgba(0,0,0,.75); }
+      .tCavity .val { display: block; font-size: clamp(20px, 15cqw, 40px); font-weight: 700;
+                      letter-spacing: -.03em; font-variant-numeric: tabular-nums; }
+      .tCavity .val i { font-size: .45em; font-style: normal; font-weight: 600; }
+      .tCavity .tgt { display: block; font-size: clamp(9px, 5cqw, 12px); color: #dfe4ec; opacity: .85; margin-top: 2px; }
+      .tProbe { background: rgba(12,16,22,.72); border-radius: 9px; padding: 4px 7px;
+                backdrop-filter: blur(2px); text-shadow: none; }
+      .tProbe .lbl { display: block; font-size: clamp(8px, 4cqw, 10px); color: #9aa3b2; }
+      .tProbe .val { display: block; font-size: clamp(13px, 8cqw, 20px); font-weight: 650;
+                     font-variant-numeric: tabular-nums; }
+      .tProbe .val i { font-size: .5em; font-style: normal; }
+      .tProbe .tgt { display: block; font-size: clamp(8px, 4cqw, 10px); color: #9aa3b2; }
+
       .hero.ring { display: grid; place-items: center; }
       .hero.ring svg { max-width: 250px; }
       .ringVal { font-size: 46px; font-weight: 700; letter-spacing: -.03em;
@@ -450,6 +585,7 @@ const EDITOR_SCHEMA = [
       select: {
         mode: 'dropdown',
         options: [
+          { value: 'thermo', label: 'Termostat + grill' },
           { value: 'photo', label: 'Zdjęcie grilla' },
           { value: 'vector', label: 'Grafika wektorowa' },
           { value: 'compact', label: 'Kompakt — liczba + grill obok' },
@@ -594,6 +730,10 @@ class WeberGrillCardEditor extends HTMLElement {
 
 customElements.define('weber-grill-card', WeberGrillCard);
 customElements.define('weber-grill-card-editor', WeberGrillCardEditor);
+
+// Exposed so the preview page can start its sliders from the card's own defaults
+// instead of keeping a second copy of the numbers that would drift.
+window.WEBER_THERMO_LAYOUT = { ...THERMO_LAYOUT };
 
 window.customCards = window.customCards || [];
 window.customCards.push({
