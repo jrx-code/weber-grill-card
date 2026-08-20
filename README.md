@@ -28,11 +28,29 @@ but every entity is configurable — any temperature sensor works.
 
 ## Install
 
-1. Copy `dist/weber-grill-card.js` to `/config/www/weber-grill-card/`.
+### HACS (recommended)
+
+1. HACS → three-dot menu → **Custom repositories**
+2. Repository `https://github.com/jrx-code/weber-grill-card`, type **Dashboard**
+3. Install, then reload the browser.
+
+HACS downloads the whole `dist` directory, so the artwork comes with the card and
+the resource is registered automatically.
+
+### Manual
+
+1. Copy the contents of `dist/` (the `.js` **and** both `.png` files) to
+   `/config/www/weber-grill-card/`.
 2. Add a Lovelace resource: `/local/weber-grill-card/weber-grill-card.js`, type
    **module**.
-3. Add the card from the GUI gallery — it appears as **Weber Grill Card** with a
-   live preview.
+
+Either way the card finds its artwork on its own: the image base is derived from
+where the script itself was loaded from, so `/hacsfiles/…` and `/local/…` both
+work with no configuration. Override with `image_base` only if you move the files
+apart.
+
+Then add the card from the GUI gallery — it appears as **Weber Grill Card** with a
+live preview.
 
 ## Configuration
 

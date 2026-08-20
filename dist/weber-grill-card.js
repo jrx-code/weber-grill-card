@@ -20,7 +20,7 @@
  * shortcuts. The card registers itself in the picker with a live preview.
  */
 
-const WEBER_CARD_VERSION = '1.4.0';
+const WEBER_CARD_VERSION = '1.5.0';
 
 // Cavity/probe colours: cold → warm → hot. Keyed on °C.
 const TEMP_STOPS = [
@@ -63,8 +63,14 @@ const THERMO_LAYOUT = {
   glow_blur: 10,     // px
 };
 
-// Artwork lives next to the card; override with `image_base` if deployed elsewhere.
-const DEFAULT_IMAGE_BASE = '/local/weber-grill-card/images/';
+// Artwork sits next to the card file, so the base is derived from where this
+// script was loaded from. That way the same build works under /hacsfiles/… after
+// a HACS install and under /local/… for a manual one, with no configuration.
+// HACS downloads the whole `dist` directory, which is why the images live there.
+const SELF_SRC = (document.currentScript && document.currentScript.src) || '';
+const DEFAULT_IMAGE_BASE = SELF_SRC
+  ? SELF_SRC.replace(/[?#].*$/, '').replace(/[^/]*$/, '')
+  : '/hacsfiles/weber-grill-card/';
 const IMAGES = { photo: 'grill-photo.png', vector: 'grill-vector.png' };
 
 // Measured on the artwork: the lid occupies x 22–78%, y 0–25%, so the top
@@ -617,6 +623,17 @@ const EDITOR_LABELS = {
   glow_h: 'Poświata — wysokość', glow_blur: 'Poświata — rozmycie',
 };
 
+const PROBE_LABELS = { name: 'Nazwa', temp: 'Temperatura sondy', target: 'Cel sondy' };
+const PROBE_SCHEMA = [
+  { name: 'name', selector: { text: {} } },
+  {
+    name: '', type: 'grid', schema: [
+      { name: 'temp', selector: { entity: { domain: ['sensor', 'number', 'input_number'] } } },
+      { name: 'target', selector: { entity: { domain: ['sensor', 'number', 'input_number'] } } },
+    ],
+  },
+];
+
 /** Slider ranges for the thermo layout; also drives the editor's slider list. */
 const LAYOUT_RANGES = {
   ring_w: [25, 65, '%'], img_scale: [60, 130, '%'],
@@ -742,11 +759,15 @@ class WeberGrillCardEditor extends HTMLElement {
           :host { display: block; }
           .sec { margin-top: 14px; }
           .sec h4 { margin: 0 0 6px; font-size: 13px; color: var(--secondary-text-color); font-weight: 500; }
-          .probe { display: grid; grid-template-columns: 1fr 1fr 1fr auto; gap: 6px; align-items: center; margin-bottom: 6px; }
-          .probe input { padding: 7px; border: 1px solid var(--divider-color, #ccc); border-radius: 4px;
-                         background: var(--card-background-color, #fff); color: var(--primary-text-color); min-width: 0; }
-          .probe button, .add { border: none; border-radius: 4px; padding: 7px 10px; cursor: pointer;
-                                background: var(--secondary-background-color); color: var(--primary-text-color); }
+          .probeRow { border: 1px solid var(--divider-color, #ccc); border-radius: 8px;
+                      padding: 8px 10px 4px; margin-bottom: 8px; }
+          .probeHead { display: flex; align-items: center; justify-content: space-between; margin-bottom: 2px; }
+          .probeHead b { font-size: 13px; }
+          .probeHead button { border: none; background: none; cursor: pointer; font-size: 14px;
+                              color: var(--secondary-text-color); padding: 2px 4px; }
+          .probeHead button:hover { color: var(--error-color, #db4437); }
+          .add { border: none; border-radius: 4px; padding: 7px 10px; cursor: pointer;
+                 background: var(--secondary-background-color); color: var(--primary-text-color); }
           .hint { font-size: 11px; color: var(--secondary-text-color); margin-bottom: 6px; }
           .tools { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 10px; }
           .tools button { border: none; border-radius: 4px; padding: 7px 11px; cursor: pointer;
@@ -769,7 +790,7 @@ class WeberGrillCardEditor extends HTMLElement {
         </div>
         <div class="sec">
           <h4>Sondy</h4>
-          <div class="hint">Encje temperatury sondy i jej celu. Puste pole celu ukrywa pasek postępu.</div>
+          <div class="hint">Wybierz encje z listy. Puste pole celu ukrywa pasek postępu.</div>
           <div id="probes"></div>
           <button class="add" id="add">+ Dodaj sondę</button>
         </div>`;
@@ -827,34 +848,49 @@ class WeberGrillCardEditor extends HTMLElement {
     this._renderProbes();
   }
 
+  /**
+   * One ha-form per probe, so its temperature and target get real entity
+   * pickers instead of a free-text field the user has to type an id into.
+   */
   _renderProbes() {
     const host = this.shadowRoot?.getElementById('probes');
     if (!host) return;
     const probes = this._config.probes || [];
-    host.innerHTML = probes.map((p, i) => `
-      <div class="probe" data-i="${i}">
-        <input data-k="name" placeholder="Nazwa" value="${esc(p.name || '')}">
-        <input data-k="temp" placeholder="sensor.…_sonda_1" value="${esc(p.temp || '')}">
-        <input data-k="target" placeholder="sensor.…_sonda_1_cel" value="${esc(p.target || '')}">
-        <button data-del="${i}" title="Usuń">✕</button>
-      </div>`).join('');
+    host.innerHTML = '';
 
-    host.querySelectorAll('input').forEach((inp) => {
-      inp.addEventListener('change', () => {
-        const i = Number(inp.closest('.probe').dataset.i);
-        const probes2 = [...(this._config.probes || [])];
-        probes2[i] = { ...probes2[i], [inp.dataset.k]: inp.value };
-        this._config = { ...this._config, probes: probes2 };
-        this._emit();
-      });
-    });
-    host.querySelectorAll('button[data-del]').forEach((btn) => {
-      btn.addEventListener('click', () => {
-        const i = Number(btn.dataset.del);
-        this._config = { ...this._config, probes: (this._config.probes || []).filter((_, n) => n !== i) };
+    probes.forEach((p, i) => {
+      const row = document.createElement('div');
+      row.className = 'probeRow';
+
+      const head = document.createElement('div');
+      head.className = 'probeHead';
+      head.innerHTML = `<b>${esc(p.name || `Sonda ${i + 1}`)}</b>`;
+      const del = document.createElement('button');
+      del.textContent = '✕';
+      del.title = 'Usuń sondę';
+      del.addEventListener('click', () => {
+        this._config = { ...this._config, probes: probes.filter((_, n) => n !== i) };
         this._emit();
         this._renderProbes();
       });
+      head.appendChild(del);
+      row.appendChild(head);
+
+      const form = document.createElement('ha-form');
+      form.hass = this._hass;
+      form.data = { name: p.name || '', temp: p.temp || '', target: p.target || '' };
+      form.schema = PROBE_SCHEMA;
+      form.computeLabel = (s) => PROBE_LABELS[s.name] || s.name;
+      form.addEventListener('value-changed', (ev) => {
+        ev.stopPropagation();
+        const next = [...(this._config.probes || [])];
+        next[i] = { ...next[i], ...ev.detail.value };
+        this._config = { ...this._config, probes: next };
+        this._emit();
+        head.querySelector('b').textContent = next[i].name || `Sonda ${i + 1}`;
+      });
+      row.appendChild(form);
+      host.appendChild(row);
     });
   }
 }

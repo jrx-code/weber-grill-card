@@ -1,5 +1,6 @@
 {
   "name": "Weber Grill Card",
   "filename": "weber-grill-card.js",
-  "render_readme": true
+  "render_readme": true,
+  "homeassistant": "2024.8.0"
 }
