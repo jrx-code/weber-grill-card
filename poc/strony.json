@@ -1,0 +1,179 @@
+{
+ "strony": [
+  [
+   "grill-karta.html",
+   "Grill: karta Lovelace",
+   "Grill",
+   "aktualne",
+   "Karta custom:weber-grill-card w czterech stanach, render na żywo z pliku produkcyjnego: zimny grill, rozgrzewanie, alarm sesji i grill niedostępny. Rysowany SVG grilla gazowego z odczytem komory na pokrywie, sondy z paskiem postępu, kolor odczytu wędruje od zimnego niebieskiego po żar. Suwaki zmieniają pierwszą kartę w czasie rzeczywistym. Karta jest wybieralna z galerii i ma edytor GUI na natywnych pickerach encji."
+  ],
+  [
+   "tlo-obrazki.html",
+   "Tło: słońce i księżyc z obrazków",
+   "Tło (sun-cycle-bg)",
+   "aktualne",
+   "Karta tła nie ma dziś tarczy słońca — słońce to sama poświata, księżyc to SVG z fazą. Tu w to samo miejsce wchodzą sun.png i moon.png, a cała poświata zostaje z rendera. Cztery warianty na jednej chwili: dzisiejszy render, obrazki wprost, obrazki z fazą (PNG przycięty terminatorem) i obrazki dostrajane do palety nieba. Suwaki wielkości tarcz, doba w 60 s."
+  ],
+  [
+   "pogoda-slajd.html",
+   "Pogoda: prognoza na slajdzie",
+   "Pogoda",
+   "aktualne",
+   "Temperatura i cztery odczyty zostają na wierzchu, bary prognozy chowają się w slajdzie. Pięć wariantów, wszystkie klikalne na żywo: przesuwane strony (simple-swipe-card), rozwijana belka (expander), slajd na dotknięcie, samoprzekładanie co 8 s i podgląd z rozwinięciem."
+  ],
+  [
+   "pogoda-ikony.html",
+   "Pogoda: animowane ikony z HACS",
+   "Pogoda",
+   "aktualne",
+   "27 animowanych SVG amCharts, które weather-card (bramkragten) trzyma na dysku od 2023 — galeria na żywo, porównanie z moimi ikonami w karcie i mapowanie stanów przepisane z weather-card.js."
+  ],
+  [
+   "pogoda-uklad.html",
+   "Pogoda: trzy piętra z pokrętłami",
+   "Pogoda",
+   "aktualne",
+   "Temperatura z animowanym stanem obok, pod nią bary prognozy, na dole Netatmo 2×3. Siedem suwaków stroi proporcje na żywo, przycisk wypisuje ustawienia do wpisania w szablon. U1 sterowany suwakami, U2 i U3 dla porównania."
+  ],
+  [
+   "pogoda-teraz.html",
+   "Pogoda: W1 + warunki bieżące",
+   "Pogoda",
+   "aktualne",
+   "Wybrany układ W1 z paskiem warunków (C1–C4) i czterema prototypami ruchu: A0, A2 (ikona żyje), A3 (tło żyje), A2+A3. Krój i wagi jak na panelu (Zen Old Mincho + monospace), temperatura precision 0, kafelki z ikonami pod wielkość. Dane z Netatmo, anemometru, deszczomierza i OWM."
+  ],
+  [
+   "pogoda-prod.html",
+   "Pogoda: karta z proda + Netatmo + bary",
+   "Pogoda",
+   "aktualne",
+   "Tania droga: wdrożona karta temperatury rośnie o odczyty z Netatmo, anemometru i deszczomierza, prognozę dalej rysuje clock-weather-card (bary to jej prawdziwy zrzut). Wykres 24 h znika. Cztery ułożenia, P1–P4."
+  ],
+  [
+   "pogoda.html",
+   "Pogoda: pięć kart zamiast trzech",
+   "Pogoda",
+   "aktualne",
+   "Wyjściowy przegląd — W1…W5, każdy z mierzoną wysokością i tym, ile zwalnia z 373 px. Stąd wziął się wybór W1."
+  ],
+  [
+   "wywoz-ikony.html",
+   "Wywóz: rozmiary ikon i napisy",
+   "Wywóz odpadów",
+   "wdrozone",
+   "Sześć krzywych rozmiaru (S0–S5) i cztery warianty napisów (N1–N4). Wdrożone: S3 + jeden rozmiar napisu."
+  ],
+  [
+   "wywoz-odpadow-karta.html",
+   "Wywóz: układ kafli",
+   "Wywóz odpadów",
+   "nieaktualne",
+   "Przymiarka układu sprzed zmiany rozmiarów ikon."
+  ],
+  [
+   "wywoz-odpadow-tlo.html",
+   "Wywóz: rząd na tle nieba",
+   "Wywóz odpadów",
+   "nieaktualne",
+   "Rząd oglądany na jedenastu porach dnia — sprzed zmiany ikon."
+  ],
+  [
+   "wywoz-odpadow.html",
+   "Wywóz: pierwsza przymiarka",
+   "Wywóz odpadów",
+   "nieaktualne",
+   "Najstarsza wersja, jeszcze z kafelkami i nagłówkiem."
+  ],
+  [
+   "pralka-neon.html",
+   "Pralka: neon wokół kafelka",
+   "Pralka",
+   "wdrozone",
+   "Sześć obwódek (A–F), sześć pulsowań rogów (E1–E6), długości tętna. Wdrożone: E4, 2 s, ramiona 5 px, bursztyn."
+  ],
+  [
+   "pralka-stany.html",
+   "Pralka: trzy twarze z szablonu",
+   "Pralka",
+   "aktualne",
+   "Rysuje wdrożony szablon washer_card na podstawionych encjach i mierzy go. Jedyna strona, która nie kopiuje markupu."
+  ],
+  [
+   "pralka-slim.html",
+   "Pralka: pięć wysokości",
+   "Pralka",
+   "wdrozone",
+   "Wybór wysokości karty bez płyty. Stąd 176 px."
+  ],
+  [
+   "pralka.html",
+   "Pralka: ikony i kształty",
+   "Pralka",
+   "nieaktualne",
+   "Pierwsza przymiarka — karta miała jeszcze płytę."
+  ],
+  [
+   "panel-stany.html",
+   "Panel w trzech stanach pralki",
+   "Panel",
+   "nieaktualne",
+   "Kopiuje markup, więc pokazuje twarz „zakończone” sprzed neonu. Do oceny stanów pralki użyj strony „trzy twarze z szablonu”."
+  ],
+  [
+   "odkurzacze-popup.html",
+   "Odkurzacze: popup",
+   "Odkurzacze",
+   "aktualne",
+   "Wdrożony popup ma 1024 px na ekranie 1080 i jest ścianą. Cztery układy master–detail: rząd pierścieni, lista rozwijana, kwadrat 2×2 i wariant, w którym pracująca maszyna prowadzi. Dane prawdziwe, zużycie i pokoje z map."
+  ],
+  [
+   "odkurzacze-kafle.html",
+   "Odkurzacze: cztery ikony",
+   "Odkurzacze",
+   "aktualne",
+   "Sama karta odkurzaczy: cztery ikony, nic więcej — szczegóły i sterowanie idą do popupu bubble-card. Trzy układy (1×4 i 2×2), cztery style kafla, pięć prototypów ruchu podczas pracy i pięć twarzy stanu. Ikony MDI, bez nowych zależności."
+  ],
+  [
+   "odkurzacze.html",
+   "Odkurzacze: cztery warianty (z pralką)",
+   "Odkurzacze",
+   "nieaktualne",
+   "Starsze podejście — odkurzacze doklejane do karty pralki. Odrzucone: karta ma być osobna i pokazywać wyłącznie ikony."
+  ],
+  [
+   "panel-kolumny.html",
+   "Panel: przemeblowanie kolumn",
+   "Panel",
+   "wdrozone",
+   "Przenoszenie kart między trzema kolumnami. Stąd dzisiejsza kolejność."
+  ],
+  [
+   "panel-odstepy.html",
+   "Panel: odstępy i ozdobniki",
+   "Panel",
+   "nieaktualne",
+   "Ozdobniki ensō — odrzucone na rzecz nagłówków nad kartami."
+  ],
+  [
+   "panel-czcionki.html",
+   "Panel: typografia",
+   "Panel",
+   "wdrozone",
+   "Dobór kroju i wag. Stąd Zen Old Mincho."
+  ]
+ ],
+ "statusy": {
+  "aktualne": [
+   "#7fe1a8",
+   "aktualne"
+  ],
+  "wdrozone": [
+   "#7cb3f9",
+   "wdrożone"
+  ],
+  "nieaktualne": [
+   "#f0a882",
+   "nieaktualne"
+  ]
+ }
+}

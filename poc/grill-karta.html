@@ -1,0 +1,178 @@
+<!doctype html>
+<html lang="pl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Grill: karta Lovelace</title>
+<style>
+  :root { color-scheme: dark; }
+  body { margin: 0; padding: 24px; background: #0f1115; color: #e6e8ec;
+         font-family: system-ui, -apple-system, "Segoe UI", sans-serif; }
+  h1 { font-size: 22px; margin: 0 0 4px; }
+  .lead { color: #9aa3b2; font-size: 14px; margin: 0 0 20px; max-width: 76ch; line-height: 1.5; }
+  .grid { display: grid; gap: 18px; grid-template-columns: repeat(auto-fill, minmax(310px, 1fr)); }
+  .cell h2 { font-size: 13px; font-weight: 600; color: #9aa3b2; margin: 0 0 8px;
+             text-transform: uppercase; letter-spacing: .06em; }
+  .cell p { font-size: 12px; color: #737d8c; margin: 8px 0 0; line-height: 1.45; }
+  .panel { margin-top: 26px; padding: 16px; border: 1px solid #232833; border-radius: 12px; background: #151922; }
+  .panel h2 { font-size: 14px; margin: 0 0 12px; }
+  .ctl { display: grid; grid-template-columns: 150px 1fr 62px; gap: 10px; align-items: center; margin-bottom: 8px; }
+  .ctl label { font-size: 13px; color: #9aa3b2; }
+  .ctl output { font-variant-numeric: tabular-nums; font-size: 13px; color: #e6e8ec; }
+  input[type=range] { width: 100%; }
+  code { background: #1b2029; padding: 1px 5px; border-radius: 4px; font-size: 12px; }
+  pre { background: #1b2029; padding: 12px; border-radius: 8px; overflow-x: auto; font-size: 12px; line-height: 1.5; }
+  /* HA design tokens the card expects, approximated for standalone preview */
+  ha-card { display: block; background: #1c2029; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,.4);
+            --primary-text-color: #e6e8ec; --secondary-text-color: #9aa3b2; --divider-color: #2b323e;
+            --secondary-background-color: #232936; --disabled-text-color: #6b7280;
+            --state-icon-active-color: #f9a825; --error-color: #db4437; --success-color: #43a047; }
+</style>
+</head>
+<body>
+<h1>Grill: karta Lovelace</h1>
+<p class="lead">
+  Ta sama karta <code>custom:weber-grill-card</code>, która stoi na panelu gabinetowym, w czterech stanach.
+  Render jest żywy — to ten sam plik <code>/local/weber-grill-card/weber-grill-card.js</code>, tylko karmiony
+  atrapą <code>hass</code> zamiast prawdziwym. Suwaki na dole zmieniają pierwszą kartę w czasie rzeczywistym:
+  kolor odczytu wędruje od zimnego niebieskiego po żar, a dym pojawia się dopiero, gdy komora się rozgrzeje.
+</p>
+
+<div class="grid" id="grid"></div>
+
+<div class="panel">
+  <h2>Sterowanie pierwszą kartą</h2>
+  <div class="ctl">
+    <label for="cav">Temperatura komory</label>
+    <input type="range" id="cav" min="15" max="320" value="31">
+    <output id="cavOut">31 °C</output>
+  </div>
+  <div class="ctl">
+    <label for="prb">Sonda 1</label>
+    <input type="range" id="prb" min="5" max="100" value="23">
+    <output id="prbOut">23 °C</output>
+  </div>
+  <div class="ctl">
+    <label for="tgt">Cel sondy</label>
+    <input type="range" id="tgt" min="20" max="100" value="40">
+    <output id="tgtOut">40 °C</output>
+  </div>
+</div>
+
+<div class="panel">
+  <h2>Konfiguracja</h2>
+  <p style="font-size:13px;color:#9aa3b2;margin:0 0 10px;line-height:1.5">
+    Karta jest wybieralna z galerii („Weber Grill Card”, z podglądem) i ma własny edytor GUI —
+    pola encji to natywne pickery HA, sondy dodaje się przyciskiem. YAML poniżej to dokładnie to,
+    co zapisuje edytor.
+  </p>
+<pre>type: custom:weber-grill-card
+name: Spirit EX325
+cavity_temp: sensor.spirit_ex325_temperatura_komory
+cavity_target: sensor.spirit_ex325_cel_komory
+battery: sensor.spirit_ex325_bateria
+wifi: binary_sensor.spirit_ex325_wifi
+cloud: binary_sensor.spirit_ex325_chmura
+bluetooth: binary_sensor.spirit_ex325_bluetooth
+last_alarm: sensor.spirit_ex325_ostatni_alarm
+probes:
+  - name: Sonda 1
+    temp: sensor.spirit_ex325_sonda_1
+    target: sensor.spirit_ex325_sonda_1_cel</pre>
+</div>
+
+<!-- The card must be defined before the demo script instantiates it. -->
+<script src="/local/weber-grill-card/weber-grill-card.js"></script>
+<script>
+// The card renders <ha-icon>, which only exists inside the HA frontend. A tiny
+// stand-in keeps the layout honest in this standalone preview.
+const GLYPHS = {
+  'mdi:wifi': '≋', 'mdi:cloud-outline': '☁', 'mdi:bluetooth': '✶',
+  'mdi:bell-ring': '🔔', 'mdi:thermometer-probe': '🌡',
+};
+class HaIconStub extends HTMLElement {
+  connectedCallback() { this._draw(); }
+  static get observedAttributes() { return ['icon']; }
+  attributeChangedCallback() { this._draw(); }
+  _draw() {
+    const i = this.getAttribute('icon') || '';
+    this.textContent = GLYPHS[i] || (i.startsWith('mdi:battery') ? '▮' : '•');
+    this.style.cssText = 'display:inline-block;line-height:1;font-size:15px';
+  }
+}
+customElements.define('ha-icon', HaIconStub);
+
+const E = (id, state, attrs = {}) => [id, { entity_id: id, state: String(state), attributes: attrs }];
+
+function mockHass(o) {
+  const s = Object.fromEntries([
+    E('sensor.cav', o.cavity ?? 'unavailable'),
+    E('sensor.cavt', o.cavityTarget ?? 'unknown'),
+    E('sensor.batt', o.batt ?? 95),
+    E('binary_sensor.wifi', o.wifi ?? 'on'),
+    E('binary_sensor.cloud', o.cloud ?? 'on'),
+    E('binary_sensor.bt', o.bt ?? 'off'),
+    E('sensor.p1', o.probe ?? 'unknown'),
+    E('sensor.p1t', o.probeTarget ?? 'unknown'),
+    E('sensor.alarm', o.alarm ?? 'unknown',
+      o.alarm ? { text: 'Probe 1 has reached the target temperature',
+                  when: new Date().toISOString() } : {}),
+  ]);
+  return { states: s };
+}
+
+const CONFIG = {
+  type: 'custom:weber-grill-card',
+  name: 'Spirit EX325',
+  cavity_temp: 'sensor.cav', cavity_target: 'sensor.cavt', battery: 'sensor.batt',
+  wifi: 'binary_sensor.wifi', cloud: 'binary_sensor.cloud', bluetooth: 'binary_sensor.bt',
+  last_alarm: 'sensor.alarm',
+  probes: [{ name: 'Sonda 1', temp: 'sensor.p1', target: 'sensor.p1t' }],
+};
+
+const VARIANTS = [
+  { h2: 'Stan bieżący (zimny)', note: 'Dokładnie to, co grill raportuje teraz: komora ledwo ciepła, sonda w otoczeniu, bateria pełna, Bluetooth rozłączony — bo telemetria idzie WiFi i chmurą.',
+    state: { cavity: 31, cavityTarget: 105, probe: 23, probeTarget: 40, batt: 95 } },
+  { h2: 'Rozgrzewanie', note: 'Komora w drodze do celu. Kolor odczytu przesuwa się w stronę żaru, nad pokrywą pojawia się dym — próg jest na tyle wysoko, że zimny grill nie „dymi” bez powodu.',
+    state: { cavity: 168, cavityTarget: 220, probe: 41, probeTarget: 68, batt: 88 } },
+  { h2: 'Alarm sesji', note: 'Sonda osiągnęła cel: czerwony pasek u góry z treścią powiadomienia i obwódka na sondzie. Alarm chowa się sam po czasie ustawionym w edytorze.',
+    state: { cavity: 214, cavityTarget: 220, probe: 68, probeTarget: 68, batt: 84,
+             alarm: 'Probe 1 Temperature Reached 68°C' } },
+  { h2: 'Grill niedostępny', note: 'Bridge żyje, ale grill odpadł. Karta przygasa i mówi to wprost, zamiast pokazywać ostatnią znaną liczbę jak aktualną.',
+    state: {} },
+];
+
+const cards = [];
+const grid = document.getElementById('grid');
+VARIANTS.forEach((v) => {
+  const cell = document.createElement('div');
+  cell.className = 'cell';
+  cell.innerHTML = `<h2>${v.h2}</h2>`;
+  const card = document.createElement('weber-grill-card');
+  card.setConfig(CONFIG);
+  card.hass = mockHass(v.state);
+  cell.appendChild(card);
+  const p = document.createElement('p');
+  p.textContent = v.note;
+  cell.appendChild(p);
+  grid.appendChild(cell);
+  cards.push({ card, base: v.state });
+});
+
+// Live controls drive the first card.
+const cav = document.getElementById('cav');
+const prb = document.getElementById('prb');
+const tgt = document.getElementById('tgt');
+function sync() {
+  document.getElementById('cavOut').textContent = `${cav.value} °C`;
+  document.getElementById('prbOut').textContent = `${prb.value} °C`;
+  document.getElementById('tgtOut').textContent = `${tgt.value} °C`;
+  cards[0].card.hass = mockHass({
+    ...cards[0].base, cavity: +cav.value, probe: +prb.value, probeTarget: +tgt.value,
+  });
+}
+[cav, prb, tgt].forEach((el) => el.addEventListener('input', sync));
+sync();
+</script>
+</body>
+</html>
