@@ -8,11 +8,14 @@
  * Visual variants live in this file and are picked with `variant`, so the preview
  * page renders the production component rather than a look-alike:
  *   thermo  — gauge left, artwork right, readings over the cook box (default)
- *   photo   — product photo of the grill, reading overlaid in the free corner
- *   vector  — the same layout on the flat vector artwork
+ *   artwork — the artwork alone, reading overlaid in the free corner
  *   compact — number leads, artwork alongside
  *   ring    — 270° gauge of progress towards the target
  *   type    — large number plus a target-marked track
+ *
+ * Photo vs. vector is not a look — it is the `artwork` option, so every layout
+ * that draws the grill honours it. Configs from before 1.7 that carried
+ * `variant: photo|vector` are migrated to `variant: artwork` plus that artwork.
  *
  * Everything tunable is in the GUI editor, not hardcoded: entity pickers, the
  * variant, on/off for the gauge, artwork, glow and probe overlay, the glow colours
@@ -20,7 +23,7 @@
  * shortcuts. The card registers itself in the picker with a live preview.
  */
 
-const WEBER_CARD_VERSION = '1.6.0';
+const WEBER_CARD_VERSION = '1.7.0';
 
 // Cavity/probe colours: cold → warm → hot. Keyed on °C.
 const TEMP_STOPS = [
@@ -32,7 +35,11 @@ const TEMP_STOPS = [
   [350, '#b02020'],
 ];
 
-const VARIANTS = ['thermo', 'photo', 'vector', 'compact', 'ring', 'type'];
+const VARIANTS = ['thermo', 'artwork', 'compact', 'ring', 'type'];
+
+// Pre-1.7 looks that only differed by which image they drew. Kept so existing
+// dashboards keep rendering: the image moves to `artwork`, the look to `artwork`.
+const LEGACY_IMAGE_VARIANTS = { photo: 'photo', vector: 'vector' };
 
 // Card and editor strings. The language follows HA (hass.language) unless the
 // `language` option pins it; anything unknown falls back to English.
@@ -64,7 +71,7 @@ const STRINGS = {
       addProbe: '+ Add probe', del: 'Remove probe',
       pName: 'Name', pTemp: 'Probe temperature', pTarget: 'Probe target',
       language: 'Language',
-      vThermo: 'Thermostat + grill', vPhoto: 'Grill photo', vVector: 'Vector artwork',
+      vThermo: 'Thermostat + grill', vArtwork: 'Artwork — reading in the corner',
       vCompact: 'Compact — number + grill', vRing: 'Gauge — progress to target',
       vType: 'Typographic — number only', aPhoto: 'Photo', aVector: 'Vector',
       langAuto: 'Follow Home Assistant',
@@ -79,7 +86,7 @@ const STRINGS = {
       cavity_temp: 'Temperatura komory', cavity_target: 'Cel komory', battery: 'Bateria',
       wifi: 'WiFi', cloud: 'Chmura', bluetooth: 'Bluetooth', last_alarm: 'Ostatni alarm',
       show_status: 'Ikony stanu', animate: 'Animacja dymu', alarm_minutes: 'Ukryj alarm po (min)',
-      show_gauge: 'Termostat (pierścień)', show_artwork: 'Zdjęcie grilla',
+      show_gauge: 'Termostat (pierścień)', show_artwork: 'Grafika grilla',
       show_glow: 'Poświata komory', show_probe_overlay: 'Sonda na grafice',
       glow_cold: 'Zimny', glow_warm: 'Rozgrzewanie', glow_hot: 'Gorący',
       glow_warm_at: 'Próg „rozgrzewanie” (°C)', glow_hot_at: 'Próg „gorący” (°C)',
@@ -97,7 +104,7 @@ const STRINGS = {
       addProbe: '+ Dodaj sondę', del: 'Usuń sondę',
       pName: 'Nazwa', pTemp: 'Temperatura sondy', pTarget: 'Cel sondy',
       language: 'Język',
-      vThermo: 'Termostat + grill', vPhoto: 'Zdjęcie grilla', vVector: 'Grafika wektorowa',
+      vThermo: 'Termostat + grill', vArtwork: 'Grafika — odczyt w rogu',
       vCompact: 'Kompakt — liczba + grill', vRing: 'Pierścień — wskaźnik celu',
       vType: 'Typograficzny — sama liczba', aPhoto: 'Zdjęcie', aVector: 'Wektor',
       langAuto: 'Zgodnie z Home Assistant',
@@ -302,6 +309,12 @@ class WeberGrillCard extends HTMLElement {
   setConfig(config) {
     if (!config) throw new Error('Brak konfiguracji');
     this._config = { ...DEFAULTS, ...config };
+    const legacy = LEGACY_IMAGE_VARIANTS[this._config.variant];
+    if (legacy) {
+      // An explicit `artwork` in the config wins; otherwise the old look names it.
+      if (config.artwork === undefined) this._config.artwork = legacy;
+      this._config.variant = 'artwork';
+    }
     if (!VARIANTS.includes(this._config.variant)) this._config.variant = DEFAULTS.variant;
     this._config.probes = Array.isArray(config.probes) ? config.probes : [];
     this._built = false;
@@ -374,8 +387,8 @@ class WeberGrillCard extends HTMLElement {
       case 'ring': return this._heroRing(cavity, target, color, pct);
       case 'type': return this._heroType(cavity, target, color, pct);
       case 'compact': return this._heroCompact(cavity, target, color, pct, heat);
-      case 'vector': return this._heroImage('vector', cavity, target, color, heat);
-      default: return this._heroImage('photo', cavity, target, color, heat);
+      case 'artwork': return this._heroImage(this._config.artwork, cavity, target, color, heat);
+      default: return this._heroThermo(cavity, target, color, pct);
     }
   }
 
@@ -750,8 +763,7 @@ const editorSchema = (T) => [
         mode: 'dropdown',
         options: [
           { value: 'thermo', label: T.ed.vThermo },
-          { value: 'photo', label: T.ed.vPhoto },
-          { value: 'vector', label: T.ed.vVector },
+          { value: 'artwork', label: T.ed.vArtwork },
           { value: 'compact', label: T.ed.vCompact },
           { value: 'ring', label: T.ed.vRing },
           { value: 'type', label: T.ed.vType },
@@ -832,6 +844,13 @@ class WeberGrillCardEditor extends HTMLElement {
 
   setConfig(config) {
     this._config = { ...config };
+    // Same migration as the card, so an old `variant: photo` shows up as the
+    // artwork look with the right image instead of an empty dropdown.
+    const legacy = LEGACY_IMAGE_VARIANTS[this._config.variant];
+    if (legacy) {
+      if (this._config.artwork === undefined) this._config.artwork = legacy;
+      this._config.variant = 'artwork';
+    }
     this._render();
   }
 
