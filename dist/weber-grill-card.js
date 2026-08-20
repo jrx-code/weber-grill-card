@@ -5,18 +5,19 @@
  * Weber grill. Built for the entities published by weber-bridge (grill-weber
  * repo), but every entity is configurable, so any temperature source works.
  *
- * Four visual variants live in this file and are picked with `variant`, so the
- * preview page renders the production component rather than a look-alike:
- *   illustration — drawn gas grill, reading on the lid badge
- *   ring         — 270° gauge of progress towards the target
- *   type         — large number plus a target-marked track
- *   hybrid       — number leads, small grill for context
+ * Visual variants live in this file and are picked with `variant`, so the preview
+ * page renders the production component rather than a look-alike:
+ *   photo   — product photo of the grill, reading overlaid in the free corner
+ *   vector  — the same layout on the flat vector artwork
+ *   compact — number leads, artwork alongside
+ *   ring    — 270° gauge of progress towards the target
+ *   type    — large number plus a target-marked track
  *
  * Ships a native GUI editor (ha-form + entity selectors) and registers itself in
  * the card picker with a live preview.
  */
 
-const WEBER_CARD_VERSION = '1.1.0';
+const WEBER_CARD_VERSION = '1.2.0';
 
 // Cavity/probe colours: cold → warm → hot. Keyed on °C.
 const TEMP_STOPS = [
@@ -28,12 +29,21 @@ const TEMP_STOPS = [
   [350, '#b02020'],
 ];
 
-const VARIANTS = ['illustration', 'ring', 'type', 'hybrid'];
+const VARIANTS = ['photo', 'vector', 'compact', 'ring', 'type'];
+
+// Artwork lives next to the card; override with `image_base` if deployed elsewhere.
+const DEFAULT_IMAGE_BASE = '/local/weber-grill-card/images/';
+const IMAGES = { photo: 'grill-photo.png', vector: 'grill-vector.png' };
+
+// Measured on the artwork: the lid occupies x 22–78%, y 0–25%, so the top
+// corners are free for the reading and the lid seam sits at ~26% height.
+const LID_SEAM = 26;
 
 const DEFAULTS = {
   title: '',
   name: 'Grill',
-  variant: 'illustration',
+  variant: 'photo',
+  artwork: 'photo',
   show_status: true,
   animate: true,
   alarm_minutes: 30,
@@ -106,7 +116,7 @@ class WeberGrillCard extends HTMLElement {
 
   /** Pre-fill from existing grill entities so picking the card yields a working one. */
   static getStubConfig(hass) {
-    const cfg = { type: 'custom:weber-grill-card', name: 'Grill', variant: 'illustration', probes: [] };
+    const cfg = { type: 'custom:weber-grill-card', name: 'Grill', variant: 'photo', probes: [] };
     if (!hass || !hass.states) return cfg;
 
     // Scoped to grill-looking entities: an unrelated wifi or battery sensor must
@@ -199,62 +209,48 @@ class WeberGrillCard extends HTMLElement {
     switch (this._config.variant) {
       case 'ring': return this._heroRing(cavity, target, color, pct);
       case 'type': return this._heroType(cavity, target, color, pct);
-      case 'hybrid': return this._heroHybrid(cavity, target, color, pct, heat);
-      default: return this._heroIllustration(cavity, target, color, heat);
+      case 'compact': return this._heroCompact(cavity, target, color, pct, heat);
+      case 'vector': return this._heroImage('vector', cavity, target, color, heat);
+      default: return this._heroImage('photo', cavity, target, color, heat);
     }
   }
 
-  _numTrack(pct, color) {
-    if (pct === null) return '';
-    return `<div class="track"><i style="width:${pct.toFixed(1)}%;background:${color}"></i></div>`;
+  _imgSrc(kind) {
+    const base = this._config.image_base || DEFAULT_IMAGE_BASE;
+    return base + (IMAGES[kind] || IMAGES.photo);
   }
 
-  _heroType(cavity, target, color, pct) {
-    return `<div class="hero type" data-entity="${esc(this._config.cavity_temp)}">
-      <div class="big" style="color:${color}">${cavity === null ? '--' : Math.round(cavity)}<sup>${esc(this._config.unit)}</sup></div>
-      <div class="sub"><span>komora</span>${target === null ? '' : `<span>cel ${Math.round(target)} ${esc(this._config.unit)}</span>`}</div>
-      ${this._numTrack(pct, color)}
+  /** Product artwork with the reading overlaid in the free top corner. */
+  _heroImage(kind, cavity, target, color, heat) {
+    const smoke = this._config.animate && heat > 0.15 ? clamp(heat, 0, 0.75).toFixed(2) : 0;
+    return `<div class="hero img" data-entity="${esc(this._config.cavity_temp)}">
+      <img src="${esc(this._imgSrc(kind))}" alt="Weber Spirit" loading="lazy">
+      <div class="ember" style="opacity:${(heat * 0.95).toFixed(2)}"></div>
+      <div class="smoke2" style="opacity:${smoke}"><i></i><i></i><i></i></div>
+      <div class="read">
+        <span class="v" style="color:${color}">${cavity === null ? '--' : Math.round(cavity)}<sup>${esc(this._config.unit)}</sup></span>
+        ${target === null ? '' : `<span class="t">cel ${Math.round(target)} ${esc(this._config.unit)}</span>`}
+      </div>
     </div>`;
   }
 
-  _heroHybrid(cavity, target, color, pct, heat) {
-    const smoke = this._config.animate && heat > 0.15 ? clamp(heat, 0, 0.8).toFixed(2) : 0;
-    return `<div class="hero hybrid" data-entity="${esc(this._config.cavity_temp)}">
+  _heroCompact(cavity, target, color, pct, heat) {
+    return `<div class="hero compact" data-entity="${esc(this._config.cavity_temp)}">
       <div>
         <div class="big sm" style="color:${color}">${cavity === null ? '--' : Math.round(cavity)}<sup>${esc(this._config.unit)}</sup></div>
         <div class="sub"><span>komora</span>${target === null ? '' : `<span>cel ${Math.round(target)} ${esc(this._config.unit)}</span>`}</div>
         ${this._numTrack(pct, color)}
       </div>
       <div class="art">
-        <svg viewBox="0 0 120 150" role="img" aria-label="Grill">
-          <defs>
-            <linearGradient id="wgLidS" x1=".2" y1="0" x2=".8" y2="1">
-              <stop offset="0" stop-color="#525a67"/><stop offset="1" stop-color="#1a1f27"/>
-            </linearGradient>
-            <radialGradient id="wgGlowS" cx=".5" cy=".5">
-              <stop offset="0" stop-color="#ff7b2e" stop-opacity=".9"/>
-              <stop offset="1" stop-color="#ff7b2e" stop-opacity="0"/>
-            </radialGradient>
-          </defs>
-          <g class="smoke" opacity="${smoke}">
-            <path d="M56 30 q-8-10 1-17 q8-7 1-14" stroke="#93a0b3" stroke-width="3" fill="none" stroke-linecap="round" opacity=".5"/>
-          </g>
-          <ellipse cx="60" cy="143" rx="40" ry="4.5" fill="#000" opacity=".45"/>
-          <path d="M18 74 C18 40 38 24 60 24 C82 24 102 40 102 74 Z" fill="url(#wgLidS)"/>
-          <path d="M24 70 C25 46 42 32 60 32 C78 32 95 46 96 70 Z" fill="#fff" opacity=".07"/>
-          <rect x="40" y="68" width="40" height="5" rx="2.5" fill="#8b95a4"/>
-          <rect x="16" y="74" width="88" height="8" rx="3" fill="#4a525f"/>
-          <ellipse cx="60" cy="82" rx="38" ry="7" fill="url(#wgGlowS)" opacity="${(heat * 0.9).toFixed(2)}"/>
-          <rect x="20" y="82" width="80" height="20" rx="4" fill="#252b35"/>
-          <g fill="#59616e"><circle cx="40" cy="92" r="4"/><circle cx="60" cy="92" r="4"/><circle cx="80" cy="92" r="4"/></g>
-          <rect x="30" y="102" width="60" height="30" rx="3" fill="#222833"/>
-          <rect x="33" y="105" width="26" height="24" rx="2" fill="#2f3742"/>
-          <rect x="61" y="105" width="26" height="24" rx="2" fill="#2f3742"/>
-          <circle cx="34" cy="134" r="7" fill="#14181f" stroke="#454e5c" stroke-width="2.5"/>
-          <circle cx="86" cy="134" r="7" fill="#14181f" stroke="#454e5c" stroke-width="2.5"/>
-        </svg>
+        <img src="${esc(this._imgSrc(this._config.artwork))}" alt="Weber Spirit" loading="lazy">
+        <div class="ember" style="opacity:${(heat * 0.95).toFixed(2)}"></div>
       </div>
     </div>`;
+  }
+
+  _numTrack(pct, color) {
+    if (pct === null) return '';
+    return `<div class="track"><i style="width:${pct.toFixed(1)}%;background:${color}"></i></div>`;
   }
 
   _heroRing(cavity, target, color, pct) {
@@ -282,85 +278,11 @@ class WeberGrillCard extends HTMLElement {
     </div>`;
   }
 
-  _heroIllustration(cavity, target, color, heat) {
-    const smoke = this._config.animate && heat > 0.15 ? clamp(heat, 0, 0.8).toFixed(2) : 0;
-    return `<div class="hero illu" data-entity="${esc(this._config.cavity_temp)}">
-      <svg viewBox="0 0 320 250" role="img" aria-label="Grill gazowy">
-        <defs>
-          <linearGradient id="wgLid" x1=".2" y1="0" x2=".75" y2="1">
-            <stop offset="0" stop-color="#5b636f"/><stop offset=".35" stop-color="#333a45"/>
-            <stop offset="1" stop-color="#171b22"/>
-          </linearGradient>
-          <linearGradient id="wgSheen" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0" stop-color="#fff" stop-opacity=".38"/><stop offset="1" stop-color="#fff" stop-opacity="0"/>
-          </linearGradient>
-          <linearGradient id="wgBody" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0" stop-color="#3d4551"/><stop offset="1" stop-color="#1b2029"/>
-          </linearGradient>
-          <linearGradient id="wgDoor" x1="0" y1="0" x2="1" y2="0">
-            <stop offset="0" stop-color="#2b323d"/><stop offset=".5" stop-color="#373f4c"/>
-            <stop offset="1" stop-color="#252b35"/>
-          </linearGradient>
-          <radialGradient id="wgGlow" cx=".5" cy=".5">
-            <stop offset="0" stop-color="#ff7b2e" stop-opacity=".85"/><stop offset="1" stop-color="#ff7b2e" stop-opacity="0"/>
-          </radialGradient>
-          <filter id="wgSoft" x="-30%" y="-30%" width="160%" height="160%"><feGaussianBlur stdDeviation="7"/></filter>
-          <filter id="wgDrop" x="-30%" y="-40%" width="160%" height="190%">
-            <feDropShadow dx="0" dy="5" stdDeviation="6" flood-color="#000" flood-opacity=".5"/>
-          </filter>
-        </defs>
-
-        <g class="smoke" opacity="${smoke}">
-          <path d="M150 74 q-13-15 2-27 q13-11 1-24" stroke="#93a0b3" stroke-width="4" fill="none" stroke-linecap="round" opacity=".5"/>
-          <path d="M172 78 q-11-13 2-24 q11-10 1-20" stroke="#93a0b3" stroke-width="3.4" fill="none" stroke-linecap="round" opacity=".35"/>
-        </g>
-
-        <ellipse cx="160" cy="236" rx="96" ry="9" fill="#000" opacity=".45" filter="url(#wgSoft)"/>
-
-        <g filter="url(#wgDrop)">
-          <path d="M36 128 h34 v9 h-34 a4 4 0 0 1 0-9z" fill="#39414d"/>
-          <path d="M284 128 h-34 v9 h34 a4 4 0 0 0 0-9z" fill="#39414d"/>
-          <rect x="40" y="137" width="6" height="26" rx="3" fill="#2a313b"/>
-          <rect x="274" y="137" width="6" height="26" rx="3" fill="#2a313b"/>
-
-          <path d="M70 128 C70 62 118 34 160 34 C202 34 250 62 250 128 Z" fill="url(#wgLid)"/>
-          <path d="M78 122 C80 70 120 44 160 44 C200 44 240 70 242 122 Z" fill="url(#wgSheen)" opacity=".5"/>
-          <path d="M70 128 C70 62 118 34 160 34 C202 34 250 62 250 128" fill="none" stroke="#6a7482" stroke-width="1.6" opacity=".7"/>
-
-          <ellipse cx="160" cy="96" rx="27" ry="17" fill="#12161d" opacity=".55"/>
-          <ellipse cx="160" cy="96" rx="27" ry="17" fill="none" stroke="#7c8798" stroke-width="1.2"/>
-          <text class="lidVal" x="160" y="103" text-anchor="middle" fill="${color}">${cavity === null ? '--' : Math.round(cavity)}°</text>
-
-          <rect x="112" y="119" width="96" height="7" rx="3.5" fill="#8b95a4"/>
-          <rect x="112" y="119" width="96" height="3" rx="1.5" fill="#c3cbd6" opacity=".55"/>
-          <rect x="116" y="126" width="7" height="7" fill="#5d6673"/>
-          <rect x="197" y="126" width="7" height="7" fill="#5d6673"/>
-
-          <rect x="66" y="128" width="188" height="12" rx="4" fill="#4a525f"/>
-          <rect x="70" y="140" width="180" height="34" rx="5" fill="url(#wgBody)"/>
-          <ellipse cx="160" cy="140" rx="76" ry="12" fill="url(#wgGlow)" opacity="${(heat * 0.9).toFixed(2)}"/>
-
-          <g>
-            <g transform="translate(105,157)"><circle r="8.5" fill="#20262f"/><circle r="6.5" fill="#59616e"/><rect x="-1.2" y="-6.5" width="2.4" height="6" rx="1.2" fill="#e8eaee"/></g>
-            <g transform="translate(160,157)"><circle r="8.5" fill="#20262f"/><circle r="6.5" fill="#59616e"/><rect x="-1.2" y="-6.5" width="2.4" height="6" rx="1.2" fill="#e8eaee"/></g>
-            <g transform="translate(215,157)"><circle r="8.5" fill="#20262f"/><circle r="6.5" fill="#59616e"/><rect x="-1.2" y="-6.5" width="2.4" height="6" rx="1.2" fill="#e8eaee"/></g>
-          </g>
-
-          <rect x="86" y="174" width="148" height="52" rx="4" fill="#222833"/>
-          <rect x="90" y="178" width="68" height="44" rx="3" fill="url(#wgDoor)"/>
-          <rect x="162" y="178" width="68" height="44" rx="3" fill="url(#wgDoor)"/>
-          <rect x="146" y="196" width="9" height="3" rx="1.5" fill="#95a0b0"/>
-          <rect x="165" y="196" width="9" height="3" rx="1.5" fill="#95a0b0"/>
-
-          <rect x="78" y="176" width="9" height="46" fill="#2a313b"/>
-          <rect x="233" y="176" width="9" height="46" fill="#2a313b"/>
-          <circle cx="82" cy="228" r="11" fill="#14181f" stroke="#454e5c" stroke-width="3.5"/>
-          <circle cx="238" cy="228" r="11" fill="#14181f" stroke="#454e5c" stroke-width="3.5"/>
-          <circle cx="82" cy="228" r="3" fill="#5d6673"/>
-          <circle cx="238" cy="228" r="3" fill="#5d6673"/>
-        </g>
-      </svg>
-      ${target === null ? '' : `<div class="illuTgt">cel ${Math.round(target)} ${esc(this._config.unit)}</div>`}
+  _heroType(cavity, target, color, pct) {
+    return `<div class="hero type" data-entity="${esc(this._config.cavity_temp)}">
+      <div class="big" style="color:${color}">${cavity === null ? '--' : Math.round(cavity)}<sup>${esc(this._config.unit)}</sup></div>
+      <div class="sub"><span>komora</span>${target === null ? '' : `<span>cel ${Math.round(target)} ${esc(this._config.unit)}</span>`}</div>
+      ${this._numTrack(pct, color)}
     </div>`;
   }
 
@@ -436,15 +358,46 @@ class WeberGrillCard extends HTMLElement {
 
       .hero { margin-top: 8px; cursor: pointer; }
       .hero svg { width: 100%; height: auto; display: block; }
-      .hero.illu { position: relative; }
-      .illuTgt { text-align: center; font-size: 12px; color: var(--secondary-text-color); margin-top: -4px; }
+
+      /* Artwork variants: the reading sits in the corner the grill leaves empty
+         (lid spans x 22–78%), so it never lands on the Weber badge. */
+      /* Container query so the overlaid reading scales with the card's own width,
+         not the viewport — the same card sits in narrow and wide columns. */
+      .hero.img { position: relative; container-type: inline-size; }
+      .hero.img img { width: 100%; height: auto; display: block; }
+      .hero.img .read { position: absolute; top: 1%; right: 1%; text-align: right;
+                        line-height: 1; pointer-events: none; }
+      .hero.img .read .v { font-size: clamp(26px, 12cqw, 44px); font-weight: 700;
+                           letter-spacing: -.035em; font-variant-numeric: tabular-nums; display: block; }
+      .hero.img .read .v sup { font-size: .42em; font-weight: 600; margin-left: 1px; }
+      .hero.img .read .t { font-size: 11px; color: var(--secondary-text-color); display: block; margin-top: 3px; }
+      /* Heat leaking from the lid seam, measured at ${LID_SEAM}% of the artwork height. */
+      .hero.img .ember, .hero.compact .ember {
+        position: absolute; left: 12%; right: 12%; top: ${LID_SEAM - 5}%; height: 16%;
+        border-radius: 50%; pointer-events: none; transition: opacity .8s ease;
+        background: radial-gradient(ellipse at center, rgba(255,123,46,.85), rgba(255,123,46,0) 70%);
+        filter: blur(6px); mix-blend-mode: screen; }
+      .hero.img .smoke2 { position: absolute; left: 40%; top: 0; width: 20%; height: 26%;
+                          pointer-events: none; transition: opacity .8s ease; }
+      .hero.img .smoke2 i { position: absolute; bottom: 0; width: 9px; height: 9px; border-radius: 50%;
+                            background: #93a0b3; opacity: 0; animation: wgPuff 4.5s ease-in-out infinite; }
+      .hero.img .smoke2 i:nth-child(1) { left: 12%; }
+      .hero.img .smoke2 i:nth-child(2) { left: 45%; animation-delay: -1.5s; }
+      .hero.img .smoke2 i:nth-child(3) { left: 74%; animation-delay: -3s; }
+      @keyframes wgPuff { 0% { transform: translateY(4px) scale(.7); opacity: 0; }
+                          35% { opacity: .5; } 100% { transform: translateY(-46px) scale(1.5); opacity: 0; } }
+      @media (prefers-reduced-motion: reduce) { .hero.img .smoke2 i { animation: none; } }
+
+      .hero.compact { display: grid; grid-template-columns: 1fr 46%; gap: 10px; align-items: center; }
+      .hero.compact .art { position: relative; }
+      .hero.compact .art img { width: 100%; height: auto; display: block; }
+
       .hero.ring { display: grid; place-items: center; }
       .hero.ring svg { max-width: 250px; }
       .ringVal { font-size: 46px; font-weight: 700; letter-spacing: -.03em;
                  font-family: var(--paper-font-headline_-_font-family, inherit); }
       .ringLbl { font-size: 13px; fill: var(--secondary-text-color); }
       .ringTgt { font-size: 12px; fill: var(--disabled-text-color); }
-      .lidVal { font-size: 21px; font-weight: 700; font-family: var(--paper-font-headline_-_font-family, inherit); }
 
       .big { font-size: 62px; font-weight: 700; line-height: .92; letter-spacing: -.045em;
              font-variant-numeric: tabular-nums; display: flex; align-items: flex-start; gap: 4px; }
@@ -454,13 +407,6 @@ class WeberGrillCard extends HTMLElement {
              font-size: 12px; color: var(--secondary-text-color); }
       .track { height: 6px; border-radius: 3px; background: var(--divider-color); margin-top: 8px; overflow: hidden; }
       .track i { display: block; height: 100%; border-radius: 3px; transition: width .6s ease; }
-      .hero.hybrid { display: grid; grid-template-columns: 1fr 108px; gap: 10px; align-items: center; }
-
-      .smoke path { animation: wgRise 4.5s ease-in-out infinite; }
-      .smoke path:nth-child(2) { animation-delay: -1.8s; }
-      @keyframes wgRise { 0% { transform: translateY(5px); opacity: .15; }
-                          50% { opacity: .6; } 100% { transform: translateY(-14px); opacity: 0; } }
-      @media (prefers-reduced-motion: reduce) { .smoke path { animation: none; } }
 
       .probes { display: grid; gap: 7px; margin-top: 11px; }
       .pr { background: var(--secondary-background-color); border-radius: 11px; padding: 9px 11px; cursor: pointer; }
@@ -489,6 +435,7 @@ class WeberGrillCard extends HTMLElement {
 // ---------------------------------------------------------------------------
 const EDITOR_LABELS = {
   title: 'Tytuł karty', name: 'Nazwa grilla', variant: 'Wygląd',
+  artwork: 'Grafika w wariancie „Kompakt”',
   cavity_temp: 'Temperatura komory', cavity_target: 'Cel komory', battery: 'Bateria',
   wifi: 'WiFi', cloud: 'Chmura', bluetooth: 'Bluetooth', last_alarm: 'Ostatni alarm',
   show_status: 'Ikony stanu', animate: 'Animacja dymu', alarm_minutes: 'Ukryj alarm po (min)',
@@ -503,10 +450,23 @@ const EDITOR_SCHEMA = [
       select: {
         mode: 'dropdown',
         options: [
-          { value: 'illustration', label: 'Ilustracja — rysowany grill' },
+          { value: 'photo', label: 'Zdjęcie grilla' },
+          { value: 'vector', label: 'Grafika wektorowa' },
+          { value: 'compact', label: 'Kompakt — liczba + grill obok' },
           { value: 'ring', label: 'Pierścień — wskaźnik celu' },
           { value: 'type', label: 'Typograficzny — sama liczba' },
-          { value: 'hybrid', label: 'Hybryda — liczba + grill' },
+        ],
+      },
+    },
+  },
+  {
+    name: 'artwork',
+    selector: {
+      select: {
+        mode: 'dropdown',
+        options: [
+          { value: 'photo', label: 'Zdjęcie' },
+          { value: 'vector', label: 'Wektor' },
         ],
       },
     },
