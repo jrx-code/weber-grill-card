@@ -1,0 +1,7 @@
+{
+ "tytul": "Grill: karta Lovelace",
+ "grupa": "Grill",
+ "status": "aktualne",
+ "opis": "Wariant thermo: pierścień z temperaturą komory po lewej, zdjęcie Spirit EX-335 po prawej, odczyt komory z celem na pokrywie i sonda obok. Komora świeci niebiesko na zimno, żółto przy rozgrzewaniu, czerwono na gorąco. Kafelki to instancje karty zainstalowanej z HACS, nie makiety — 13 suwaków stroi rozmieszczenie na żywo, przycisk wypisuje gotowy YAML, a te same pokrętła siedzą w edytorze karty w HA. Sceny przełączają dane (zimny, rozgrzewanie, gorący, alarm, niedostępny); niżej pozostałe warianty: photo, vector, compact, ring.",
+ "kolejnosc": 5
+}
