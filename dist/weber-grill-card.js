@@ -18,12 +18,15 @@
  * `variant: photo|vector` are migrated to `variant: artwork` plus that artwork.
  *
  * Everything tunable is in the GUI editor, not hardcoded: entity pickers, the
- * variant, on/off for the gauge, artwork, glow and probe overlay, the glow colours
- * with their thresholds, and a slider per layout coordinate — plus centre/reset
- * shortcuts. The card registers itself in the picker with a live preview.
+ * look and artwork, on/off for the glow, status icons and probe overlay (plus
+ * smoke in the artwork look, the only one that draws it),
+ * the glow colours with their thresholds, and a slider per layout coordinate —
+ * plus centre/reset shortcuts. The gauge and artwork halves of the thermo look
+ * stay YAML-only (`show_gauge`, `show_artwork`): switching one off is what the
+ * other looks already are. The card registers itself in the picker with a live preview.
  */
 
-const WEBER_CARD_VERSION = '1.7.0';
+const WEBER_CARD_VERSION = '1.8.0';
 
 // Cavity/probe colours: cold → warm → hot. Keyed on °C.
 const TEMP_STOPS = [
@@ -208,6 +211,16 @@ function toHex(v, fallback) {
   }
   if (typeof v === 'string' && /^#[0-9a-f]{6}$/i.test(v.trim())) return v.trim();
   return fallback;
+}
+
+/** The three glow colours as [r,g,b], which is what HA's colour picker reads. */
+function glowRgbTriplets(cfg = {}) {
+  const out = {};
+  ['glow_cold', 'glow_warm', 'glow_hot'].forEach((k) => {
+    const hex = toHex(cfg[k], GLOW_DEFAULTS[k]);
+    out[k] = [1, 3, 5].map((i) => parseInt(hex.substr(i, 2), 16));
+  });
+  return out;
 }
 
 /** Colour of the glow around the cook box: cold → warming → hot, per config. */
@@ -399,11 +412,14 @@ class WeberGrillCard extends HTMLElement {
 
   /** Product artwork with the reading overlaid in the free top corner. */
   _heroImage(kind, cavity, target, color, heat) {
-    const smoke = this._config.animate && heat > 0.15 ? clamp(heat, 0, 0.75).toFixed(2) : 0;
+    // Dropped rather than faded to opacity 0: an invisible element still runs the
+    // puff animation, which is exactly what the switch was turned off to stop.
+    const smoke = (this._config.animate === false || heat <= 0.15) ? null
+      : clamp(heat, 0, 0.75).toFixed(2);
     return `<div class="hero img" data-entity="${esc(this._config.cavity_temp)}">
       <img src="${esc(this._imgSrc(kind))}" alt="Weber Spirit" loading="lazy">
       <div class="ember" style="opacity:${(heat * 0.95).toFixed(2)}"></div>
-      <div class="smoke2" style="opacity:${smoke}"><i></i><i></i><i></i></div>
+      ${smoke === null ? '' : `<div class="smoke2" style="opacity:${smoke}"><i></i><i></i><i></i></div>`}
       <div class="read">
         <span class="v" style="color:${color}">${cavity === null ? '--' : Math.round(cavity)}<sup>${esc(this._config.unit)}</sup></span>
         ${target === null ? '' : `<span class="t">${esc(this._t.target)} ${Math.round(target)} ${esc(this._config.unit)}</span>`}
@@ -627,16 +643,25 @@ class WeberGrillCard extends HTMLElement {
         border-radius: 50%; pointer-events: none; transition: opacity .8s ease;
         background: radial-gradient(ellipse at center, rgba(255,123,46,.85), rgba(255,123,46,0) 70%);
         filter: blur(6px); mix-blend-mode: screen; }
-      .hero.img .smoke2 { position: absolute; left: 40%; top: 0; width: 20%; height: 26%;
-                          pointer-events: none; transition: opacity .8s ease; }
-      .hero.img .smoke2 i { position: absolute; bottom: 0; width: 9px; height: 9px; border-radius: 50%;
-                            background: #93a0b3; opacity: 0; animation: wgPuff 4.5s ease-in-out infinite; }
-      .hero.img .smoke2 i:nth-child(1) { left: 12%; }
-      .hero.img .smoke2 i:nth-child(2) { left: 45%; animation-delay: -1.5s; }
-      .hero.img .smoke2 i:nth-child(3) { left: 74%; animation-delay: -3s; }
-      @keyframes wgPuff { 0% { transform: translateY(4px) scale(.7); opacity: 0; }
-                          35% { opacity: .5; } 100% { transform: translateY(-46px) scale(1.5); opacity: 0; } }
-      @media (prefers-reduced-motion: reduce) { .hero.img .smoke2 i { animation: none; } }
+      /* Only the artwork look has empty space above the grill for smoke to rise
+         into; in thermo the image fills its box from the top, so puffs would sit
+         on the lit lid, under the readout. Hence the switch is offered there only. */
+      .smoke2 { position: absolute; left: 40%; top: 0; width: 20%; height: 26%;
+                pointer-events: none; transition: opacity .8s ease; }
+      /* Lighter and larger than the first cut: the puffs sit over the lid, which is
+         black in both artworks, and at 9px/#93a0b3 they were hard to make out. */
+      .smoke2 i { position: absolute; bottom: 0; width: 11px; height: 11px; border-radius: 50%;
+                  background: #c3ccd8; filter: blur(1px);
+                  opacity: 0; animation: wgPuff 4.5s ease-in-out infinite; }
+      .smoke2 i:nth-child(1) { left: 12%; }
+      .smoke2 i:nth-child(2) { left: 45%; animation-delay: -1.5s; }
+      .smoke2 i:nth-child(3) { left: 74%; animation-delay: -3s; }
+      /* The rise is a percentage of the smoke box, not a fixed 46px, so the puffs
+         stay inside the artwork whether the box is the tall one of the artwork
+         look or the strip between the lid and the card header in thermo. */
+      @keyframes wgPuff { 0% { bottom: 0; transform: scale(.7); opacity: 0; }
+                          35% { opacity: .62; } 100% { bottom: calc(100% - 14px); transform: scale(1.5); opacity: 0; } }
+      @media (prefers-reduced-motion: reduce) { .smoke2 i { animation: none; } }
 
       .hero.compact { display: grid; grid-template-columns: 1fr 46%; gap: 10px; align-items: center; }
       .hero.compact .art { position: relative; }
@@ -736,7 +761,7 @@ const layoutSchema = () => Object.entries(LAYOUT_RANGES).map(([name, [min, max, 
   selector: { number: { min, max, step: 1, mode: 'slider', unit_of_measurement: unit } },
 }));
 
-const editorSchema = (T) => [
+const editorSchema = (T, cfg = {}) => [
   {
     name: '', type: 'grid', schema: [
       { name: 'name', selector: { text: {} } },
@@ -795,13 +820,16 @@ const editorSchema = (T) => [
     ],
   },
   {
+    // show_gauge / show_artwork are deliberately absent: switching either half of
+    // the thermo look off is what the other looks already are, so the toggles only
+    // duplicated the Look dropdown. Both still work from YAML.
     name: '', type: 'grid', schema: [
-      { name: 'show_gauge', selector: { boolean: {} } },
-      { name: 'show_artwork', selector: { boolean: {} } },
       { name: 'show_glow', selector: { boolean: {} } },
       { name: 'show_probe_overlay', selector: { boolean: {} } },
       { name: 'show_status', selector: { boolean: {} } },
-      { name: 'animate', selector: { boolean: {} } },
+      // Smoke exists in the artwork look only, so the switch is offered there
+      // only — a control that cannot change anything is worse than none.
+      ...(cfg.variant === 'artwork' ? [{ name: 'animate', selector: { boolean: {} } }] : []),
       { name: 'alarm_minutes', selector: { number: { min: 0, max: 720, mode: 'box' } } },
     ],
   },
@@ -952,11 +980,19 @@ class WeberGrillCardEditor extends HTMLElement {
       this._built = true;
     }
     this._applyEditorStrings();
-    this._form.schema = editorSchema(this._t);
-    // Show the effective values, not blanks: sliders start where the card starts.
+    this._form.schema = editorSchema(this._t, this._config);
+    // Show the effective values, not blanks: every control starts where the card
+    // starts. DEFAULTS matters most for the switches — ha-selector-boolean draws
+    // `undefined` as off, so an omitted `show_status: true` used to render as a
+    // switch that said "off" while the icons were on screen, and toggling it on
+    // changed nothing because it already was.
     this._form.data = {
-      ...GLOW_DEFAULTS,
+      ...DEFAULTS,
       ...this._config,
+      // color_rgb hands its value to rgb2hex(), which indexes it as [r,g,b]; a
+      // hex string there yields "#NaNNaNNaN" and <input type=color> falls back to
+      // black. Hence hex in the config, triplets in the form.
+      ...glowRgbTriplets(this._config),
       layout: { ...THERMO_LAYOUT, ...(this._config.layout || {}) },
     };
     if (this._hass) this._form.hass = this._hass;
