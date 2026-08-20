@@ -1,16 +1,22 @@
 /**
  * Weber Grill Card — Home Assistant Lovelace custom card.
  *
- * Renders the grill as an actual grill: an SVG gas grill whose lid carries the
- * cavity temperature, with probe rows underneath and a banner for cook-session
- * alerts. Built for the entities published by weber-bridge (grill-weber repo),
- * but every entity is configurable, so it works with any temperature source.
+ * Shows cavity temperature, probes, connectivity and cook-session alerts for a
+ * Weber grill. Built for the entities published by weber-bridge (grill-weber
+ * repo), but every entity is configurable, so any temperature source works.
+ *
+ * Four visual variants live in this file and are picked with `variant`, so the
+ * preview page renders the production component rather than a look-alike:
+ *   illustration — drawn gas grill, reading on the lid badge
+ *   ring         — 270° gauge of progress towards the target
+ *   type         — large number plus a target-marked track
+ *   hybrid       — number leads, small grill for context
  *
  * Ships a native GUI editor (ha-form + entity selectors) and registers itself in
  * the card picker with a live preview.
  */
 
-const WEBER_CARD_VERSION = '1.0.0';
+const WEBER_CARD_VERSION = '1.1.0';
 
 // Cavity/probe colours: cold → warm → hot. Keyed on °C.
 const TEMP_STOPS = [
@@ -22,41 +28,37 @@ const TEMP_STOPS = [
   [350, '#b02020'],
 ];
 
+const VARIANTS = ['illustration', 'ring', 'type', 'hybrid'];
+
 const DEFAULTS = {
   title: '',
   name: 'Grill',
-  show_image: true,
+  variant: 'illustration',
   show_status: true,
   animate: true,
   alarm_minutes: 30,
   unit: '°C',
 };
 
-function clamp(v, lo, hi) {
-  return Math.min(hi, Math.max(lo, v));
+const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
+
+function mixHex(a, b, f) {
+  const p = (s) => [1, 3, 5].map((i) => parseInt(s.substr(i, 2), 16));
+  const [x, y] = [p(a), p(b)];
+  return `rgb(${x.map((v, i) => Math.round(v + (y[i] - v) * f)).join(',')})`;
 }
 
 function tempColor(t) {
-  if (t === null || t === undefined || Number.isNaN(t)) return 'var(--disabled-text-color, #888)';
-  const stops = TEMP_STOPS;
-  if (t <= stops[0][0]) return stops[0][1];
-  if (t >= stops[stops.length - 1][0]) return stops[stops.length - 1][1];
-  for (let i = 0; i < stops.length - 1; i++) {
-    const [t0, c0] = stops[i];
-    const [t1, c1] = stops[i + 1];
-    if (t >= t0 && t <= t1) {
-      const f = (t - t0) / (t1 - t0);
-      return mixHex(c0, c1, f);
-    }
+  if (t === null || t === undefined || Number.isNaN(t)) return 'var(--disabled-text-color, #6c7583)';
+  if (t <= TEMP_STOPS[0][0]) return TEMP_STOPS[0][1];
+  const last = TEMP_STOPS[TEMP_STOPS.length - 1];
+  if (t >= last[0]) return last[1];
+  for (let i = 0; i < TEMP_STOPS.length - 1; i++) {
+    const [t0, c0] = TEMP_STOPS[i];
+    const [t1, c1] = TEMP_STOPS[i + 1];
+    if (t >= t0 && t <= t1) return mixHex(c0, c1, (t - t0) / (t1 - t0));
   }
-  return stops[stops.length - 1][1];
-}
-
-function mixHex(a, b, f) {
-  const pa = [1, 3, 5].map((i) => parseInt(a.substr(i, 2), 16));
-  const pb = [1, 3, 5].map((i) => parseInt(b.substr(i, 2), 16));
-  const p = pa.map((v, i) => Math.round(v + (pb[i] - v) * f));
-  return `rgb(${p[0]}, ${p[1]}, ${p[2]})`;
+  return last[1];
 }
 
 function esc(s) {
@@ -65,7 +67,6 @@ function esc(s) {
   ));
 }
 
-/** Numeric state, or null for unknown/unavailable/non-numeric. */
 function numState(hass, entityId) {
   if (!entityId || !hass) return null;
   const st = hass.states[entityId];
@@ -77,8 +78,7 @@ function numState(hass, entityId) {
 function isOn(hass, entityId) {
   if (!entityId || !hass) return null;
   const st = hass.states[entityId];
-  if (!st) return null;
-  if (st.state === 'unavailable' || st.state === 'unknown') return null;
+  if (!st || st.state === 'unavailable' || st.state === 'unknown') return null;
   return st.state === 'on';
 }
 
@@ -104,16 +104,13 @@ class WeberGrillCard extends HTMLElement {
     return document.createElement('weber-grill-card-editor');
   }
 
-  /**
-   * Pre-fill from whatever grill entities exist, so picking the card from the
-   * GUI yields a working card instead of an empty shell.
-   */
+  /** Pre-fill from existing grill entities so picking the card yields a working one. */
   static getStubConfig(hass) {
-    const cfg = { type: 'custom:weber-grill-card', name: 'Grill', probes: [] };
+    const cfg = { type: 'custom:weber-grill-card', name: 'Grill', variant: 'illustration', probes: [] };
     if (!hass || !hass.states) return cfg;
 
-    // Only consider entities that look like a grill, so an unrelated "wifi" or
-    // "battery" sensor never gets wired in behind the user's back.
+    // Scoped to grill-looking entities: an unrelated wifi or battery sensor must
+    // never get wired in behind the user's back.
     const GRILL = /spirit|weber|grill/i;
     const ids = Object.keys(hass.states).filter((id) => GRILL.test(id));
     const find = (domain, re) => ids.find((id) => id.startsWith(domain) && re.test(id));
@@ -126,15 +123,12 @@ class WeberGrillCard extends HTMLElement {
     cfg.cloud = find('binary_sensor.', /chmura|cloud/);
     cfg.bluetooth = find('binary_sensor.', /bluetooth/);
 
-    // Probes: sensor.<...>_sonda_N / _probe_N plus its matching target sibling.
     const probeRe = /(sonda|probe)_(\d+)$/;
-    ids.filter((id) => id.startsWith('sensor.') && probeRe.test(id))
-      .sort()
-      .forEach((id) => {
-        const n = id.match(probeRe)[2];
-        const target = ids.find((t) => t === `${id}_cel` || t === `${id}_target`);
-        cfg.probes.push({ name: `Sonda ${n}`, temp: id, target });
-      });
+    ids.filter((id) => id.startsWith('sensor.') && probeRe.test(id)).sort().forEach((id) => {
+      const n = id.match(probeRe)[2];
+      const target = ids.find((t) => t === `${id}_cel` || t === `${id}_target`);
+      cfg.probes.push({ name: `Sonda ${n}`, temp: id, target });
+    });
 
     Object.keys(cfg).forEach((k) => cfg[k] === undefined && delete cfg[k]);
     return cfg;
@@ -143,6 +137,7 @@ class WeberGrillCard extends HTMLElement {
   setConfig(config) {
     if (!config) throw new Error('Brak konfiguracji');
     this._config = { ...DEFAULTS, ...config };
+    if (!VARIANTS.includes(this._config.variant)) this._config.variant = DEFAULTS.variant;
     this._config.probes = Array.isArray(config.probes) ? config.probes : [];
     this._built = false;
     this._render();
@@ -157,82 +152,234 @@ class WeberGrillCard extends HTMLElement {
     return 4 + Math.ceil((this._config?.probes?.length || 0) / 2);
   }
 
-  static getLayoutOptions() {
-    return { grid_rows: 5, grid_columns: 4, grid_min_rows: 3 };
-  }
-
   // -- rendering --------------------------------------------------------
   _render() {
     if (!this._config) return;
     const c = this._config;
-    const hass = this._hass;
 
-    const cavity = numState(hass, c.cavity_temp);
-    const target = numState(hass, c.cavity_target);
-    const batt = numState(hass, c.battery);
-    const online = c.cavity_temp ? isAvailable(hass, c.cavity_temp) : true;
-
-    const heat = cavity === null ? 0 : clamp((cavity - 25) / 225, 0, 1);
-    const color = tempColor(cavity);
+    const cavity = numState(this._hass, c.cavity_temp);
+    const target = numState(this._hass, c.cavity_target);
+    const battery = numState(this._hass, c.battery);
+    const online = c.cavity_temp ? isAvailable(this._hass, c.cavity_temp) : true;
 
     if (!this._built) {
       this.shadowRoot.innerHTML = `<style>${this._css()}</style><ha-card></ha-card>`;
       this._built = true;
     }
-    const card = this.shadowRoot.querySelector('ha-card');
 
+    const card = this.shadowRoot.querySelector('ha-card');
     card.innerHTML = `
       ${c.title ? `<h1 class="card-header">${esc(c.title)}</h1>` : ''}
       <div class="wrap${online ? '' : ' offline'}">
+        <div class="hd">
+          <span class="nm">${esc(c.name || 'Grill')}</span>
+          ${c.show_status ? this._chips(battery) : ''}
+        </div>
         ${this._alarmBanner()}
-        <div class="top">
-          <div class="name">${esc(c.name || 'Grill')}</div>
-          ${c.show_status ? this._statusChips(batt) : ''}
-        </div>
-        <div class="hero">
-          ${c.show_image ? this._grillSvg(heat, color, cavity, target) : this._bigReadout(cavity, target, color)}
-        </div>
-        ${this._probesHtml()}
+        ${this._hero(cavity, target)}
+        ${this._probes()}
         ${online ? '' : '<div class="offline-note">Grill niedostępny</div>'}
-      </div>
-    `;
+      </div>`;
 
     card.querySelectorAll('[data-entity]').forEach((el) => {
       el.addEventListener('click', (ev) => {
         ev.stopPropagation();
-        this._showMore(el.getAttribute('data-entity'));
+        const e = new Event('hass-more-info', { bubbles: true, composed: true });
+        e.detail = { entityId: el.getAttribute('data-entity') };
+        this.dispatchEvent(e);
       });
     });
   }
 
-  _showMore(entityId) {
-    if (!entityId) return;
-    const ev = new Event('hass-more-info', { bubbles: true, composed: true });
-    ev.detail = { entityId };
-    this.dispatchEvent(ev);
+  /** Dispatch on the configured variant. */
+  _hero(cavity, target) {
+    const color = tempColor(cavity);
+    const heat = cavity === null ? 0 : clamp((cavity - 45) / 175, 0, 1);
+    const pct = (cavity !== null && target) ? clamp((cavity / target) * 100, 0, 100) : null;
+    switch (this._config.variant) {
+      case 'ring': return this._heroRing(cavity, target, color, pct);
+      case 'type': return this._heroType(cavity, target, color, pct);
+      case 'hybrid': return this._heroHybrid(cavity, target, color, pct, heat);
+      default: return this._heroIllustration(cavity, target, color, heat);
+    }
   }
 
-  _statusChips(batt) {
+  _numTrack(pct, color) {
+    if (pct === null) return '';
+    return `<div class="track"><i style="width:${pct.toFixed(1)}%;background:${color}"></i></div>`;
+  }
+
+  _heroType(cavity, target, color, pct) {
+    return `<div class="hero type" data-entity="${esc(this._config.cavity_temp)}">
+      <div class="big" style="color:${color}">${cavity === null ? '--' : Math.round(cavity)}<sup>${esc(this._config.unit)}</sup></div>
+      <div class="sub"><span>komora</span>${target === null ? '' : `<span>cel ${Math.round(target)} ${esc(this._config.unit)}</span>`}</div>
+      ${this._numTrack(pct, color)}
+    </div>`;
+  }
+
+  _heroHybrid(cavity, target, color, pct, heat) {
+    const smoke = this._config.animate && heat > 0.15 ? clamp(heat, 0, 0.8).toFixed(2) : 0;
+    return `<div class="hero hybrid" data-entity="${esc(this._config.cavity_temp)}">
+      <div>
+        <div class="big sm" style="color:${color}">${cavity === null ? '--' : Math.round(cavity)}<sup>${esc(this._config.unit)}</sup></div>
+        <div class="sub"><span>komora</span>${target === null ? '' : `<span>cel ${Math.round(target)} ${esc(this._config.unit)}</span>`}</div>
+        ${this._numTrack(pct, color)}
+      </div>
+      <div class="art">
+        <svg viewBox="0 0 120 150" role="img" aria-label="Grill">
+          <defs>
+            <linearGradient id="wgLidS" x1=".2" y1="0" x2=".8" y2="1">
+              <stop offset="0" stop-color="#525a67"/><stop offset="1" stop-color="#1a1f27"/>
+            </linearGradient>
+            <radialGradient id="wgGlowS" cx=".5" cy=".5">
+              <stop offset="0" stop-color="#ff7b2e" stop-opacity=".9"/>
+              <stop offset="1" stop-color="#ff7b2e" stop-opacity="0"/>
+            </radialGradient>
+          </defs>
+          <g class="smoke" opacity="${smoke}">
+            <path d="M56 30 q-8-10 1-17 q8-7 1-14" stroke="#93a0b3" stroke-width="3" fill="none" stroke-linecap="round" opacity=".5"/>
+          </g>
+          <ellipse cx="60" cy="143" rx="40" ry="4.5" fill="#000" opacity=".45"/>
+          <path d="M18 74 C18 40 38 24 60 24 C82 24 102 40 102 74 Z" fill="url(#wgLidS)"/>
+          <path d="M24 70 C25 46 42 32 60 32 C78 32 95 46 96 70 Z" fill="#fff" opacity=".07"/>
+          <rect x="40" y="68" width="40" height="5" rx="2.5" fill="#8b95a4"/>
+          <rect x="16" y="74" width="88" height="8" rx="3" fill="#4a525f"/>
+          <ellipse cx="60" cy="82" rx="38" ry="7" fill="url(#wgGlowS)" opacity="${(heat * 0.9).toFixed(2)}"/>
+          <rect x="20" y="82" width="80" height="20" rx="4" fill="#252b35"/>
+          <g fill="#59616e"><circle cx="40" cy="92" r="4"/><circle cx="60" cy="92" r="4"/><circle cx="80" cy="92" r="4"/></g>
+          <rect x="30" y="102" width="60" height="30" rx="3" fill="#222833"/>
+          <rect x="33" y="105" width="26" height="24" rx="2" fill="#2f3742"/>
+          <rect x="61" y="105" width="26" height="24" rx="2" fill="#2f3742"/>
+          <circle cx="34" cy="134" r="7" fill="#14181f" stroke="#454e5c" stroke-width="2.5"/>
+          <circle cx="86" cy="134" r="7" fill="#14181f" stroke="#454e5c" stroke-width="2.5"/>
+        </svg>
+      </div>
+    </div>`;
+  }
+
+  _heroRing(cavity, target, color, pct) {
+    const ARC = 367;           // length of a 270° arc at r=78
+    const p = pct === null ? 0 : pct;
+    return `<div class="hero ring" data-entity="${esc(this._config.cavity_temp)}">
+      <svg viewBox="0 0 200 200" role="img" aria-label="Wskaźnik temperatury komory">
+        <defs>
+          <linearGradient id="wgArc" x1="0" y1="1" x2="1" y2="0">
+            <stop offset="0" stop-color="#4a90d9"/><stop offset=".5" stop-color="#e0a33a"/>
+            <stop offset="1" stop-color="#d1442f"/>
+          </linearGradient>
+        </defs>
+        <circle cx="100" cy="100" r="78" fill="none" stroke="var(--divider-color,#232a36)" stroke-width="13"
+                stroke-dasharray="${ARC} 490" stroke-linecap="round" transform="rotate(135 100 100)"/>
+        <circle cx="100" cy="100" r="78" fill="none" stroke="url(#wgArc)" stroke-width="13"
+                stroke-dasharray="${(ARC * p / 100).toFixed(1)} 490" stroke-linecap="round"
+                transform="rotate(135 100 100)"/>
+        <line x1="100" y1="14" x2="100" y2="30" stroke="var(--primary-text-color,#e8eaee)" stroke-width="3"
+              stroke-linecap="round" opacity=".8" transform="rotate(${(270 * p / 100).toFixed(1)} 100 100)"/>
+        <text class="ringVal" x="100" y="103" text-anchor="middle" fill="${color}">${cavity === null ? '--' : Math.round(cavity)}</text>
+        <text class="ringLbl" x="100" y="122" text-anchor="middle">${esc(this._config.unit)} w komorze</text>
+        ${target === null ? '' : `<text class="ringTgt" x="100" y="146" text-anchor="middle">cel ${Math.round(target)}${esc(this._config.unit)}</text>`}
+      </svg>
+    </div>`;
+  }
+
+  _heroIllustration(cavity, target, color, heat) {
+    const smoke = this._config.animate && heat > 0.15 ? clamp(heat, 0, 0.8).toFixed(2) : 0;
+    return `<div class="hero illu" data-entity="${esc(this._config.cavity_temp)}">
+      <svg viewBox="0 0 320 250" role="img" aria-label="Grill gazowy">
+        <defs>
+          <linearGradient id="wgLid" x1=".2" y1="0" x2=".75" y2="1">
+            <stop offset="0" stop-color="#5b636f"/><stop offset=".35" stop-color="#333a45"/>
+            <stop offset="1" stop-color="#171b22"/>
+          </linearGradient>
+          <linearGradient id="wgSheen" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0" stop-color="#fff" stop-opacity=".38"/><stop offset="1" stop-color="#fff" stop-opacity="0"/>
+          </linearGradient>
+          <linearGradient id="wgBody" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0" stop-color="#3d4551"/><stop offset="1" stop-color="#1b2029"/>
+          </linearGradient>
+          <linearGradient id="wgDoor" x1="0" y1="0" x2="1" y2="0">
+            <stop offset="0" stop-color="#2b323d"/><stop offset=".5" stop-color="#373f4c"/>
+            <stop offset="1" stop-color="#252b35"/>
+          </linearGradient>
+          <radialGradient id="wgGlow" cx=".5" cy=".5">
+            <stop offset="0" stop-color="#ff7b2e" stop-opacity=".85"/><stop offset="1" stop-color="#ff7b2e" stop-opacity="0"/>
+          </radialGradient>
+          <filter id="wgSoft" x="-30%" y="-30%" width="160%" height="160%"><feGaussianBlur stdDeviation="7"/></filter>
+          <filter id="wgDrop" x="-30%" y="-40%" width="160%" height="190%">
+            <feDropShadow dx="0" dy="5" stdDeviation="6" flood-color="#000" flood-opacity=".5"/>
+          </filter>
+        </defs>
+
+        <g class="smoke" opacity="${smoke}">
+          <path d="M150 74 q-13-15 2-27 q13-11 1-24" stroke="#93a0b3" stroke-width="4" fill="none" stroke-linecap="round" opacity=".5"/>
+          <path d="M172 78 q-11-13 2-24 q11-10 1-20" stroke="#93a0b3" stroke-width="3.4" fill="none" stroke-linecap="round" opacity=".35"/>
+        </g>
+
+        <ellipse cx="160" cy="236" rx="96" ry="9" fill="#000" opacity=".45" filter="url(#wgSoft)"/>
+
+        <g filter="url(#wgDrop)">
+          <path d="M36 128 h34 v9 h-34 a4 4 0 0 1 0-9z" fill="#39414d"/>
+          <path d="M284 128 h-34 v9 h34 a4 4 0 0 0 0-9z" fill="#39414d"/>
+          <rect x="40" y="137" width="6" height="26" rx="3" fill="#2a313b"/>
+          <rect x="274" y="137" width="6" height="26" rx="3" fill="#2a313b"/>
+
+          <path d="M70 128 C70 62 118 34 160 34 C202 34 250 62 250 128 Z" fill="url(#wgLid)"/>
+          <path d="M78 122 C80 70 120 44 160 44 C200 44 240 70 242 122 Z" fill="url(#wgSheen)" opacity=".5"/>
+          <path d="M70 128 C70 62 118 34 160 34 C202 34 250 62 250 128" fill="none" stroke="#6a7482" stroke-width="1.6" opacity=".7"/>
+
+          <ellipse cx="160" cy="96" rx="27" ry="17" fill="#12161d" opacity=".55"/>
+          <ellipse cx="160" cy="96" rx="27" ry="17" fill="none" stroke="#7c8798" stroke-width="1.2"/>
+          <text class="lidVal" x="160" y="103" text-anchor="middle" fill="${color}">${cavity === null ? '--' : Math.round(cavity)}°</text>
+
+          <rect x="112" y="119" width="96" height="7" rx="3.5" fill="#8b95a4"/>
+          <rect x="112" y="119" width="96" height="3" rx="1.5" fill="#c3cbd6" opacity=".55"/>
+          <rect x="116" y="126" width="7" height="7" fill="#5d6673"/>
+          <rect x="197" y="126" width="7" height="7" fill="#5d6673"/>
+
+          <rect x="66" y="128" width="188" height="12" rx="4" fill="#4a525f"/>
+          <rect x="70" y="140" width="180" height="34" rx="5" fill="url(#wgBody)"/>
+          <ellipse cx="160" cy="140" rx="76" ry="12" fill="url(#wgGlow)" opacity="${(heat * 0.9).toFixed(2)}"/>
+
+          <g>
+            <g transform="translate(105,157)"><circle r="8.5" fill="#20262f"/><circle r="6.5" fill="#59616e"/><rect x="-1.2" y="-6.5" width="2.4" height="6" rx="1.2" fill="#e8eaee"/></g>
+            <g transform="translate(160,157)"><circle r="8.5" fill="#20262f"/><circle r="6.5" fill="#59616e"/><rect x="-1.2" y="-6.5" width="2.4" height="6" rx="1.2" fill="#e8eaee"/></g>
+            <g transform="translate(215,157)"><circle r="8.5" fill="#20262f"/><circle r="6.5" fill="#59616e"/><rect x="-1.2" y="-6.5" width="2.4" height="6" rx="1.2" fill="#e8eaee"/></g>
+          </g>
+
+          <rect x="86" y="174" width="148" height="52" rx="4" fill="#222833"/>
+          <rect x="90" y="178" width="68" height="44" rx="3" fill="url(#wgDoor)"/>
+          <rect x="162" y="178" width="68" height="44" rx="3" fill="url(#wgDoor)"/>
+          <rect x="146" y="196" width="9" height="3" rx="1.5" fill="#95a0b0"/>
+          <rect x="165" y="196" width="9" height="3" rx="1.5" fill="#95a0b0"/>
+
+          <rect x="78" y="176" width="9" height="46" fill="#2a313b"/>
+          <rect x="233" y="176" width="9" height="46" fill="#2a313b"/>
+          <circle cx="82" cy="228" r="11" fill="#14181f" stroke="#454e5c" stroke-width="3.5"/>
+          <circle cx="238" cy="228" r="11" fill="#14181f" stroke="#454e5c" stroke-width="3.5"/>
+          <circle cx="82" cy="228" r="3" fill="#5d6673"/>
+          <circle cx="238" cy="228" r="3" fill="#5d6673"/>
+        </g>
+      </svg>
+      ${target === null ? '' : `<div class="illuTgt">cel ${Math.round(target)} ${esc(this._config.unit)}</div>`}
+    </div>`;
+  }
+
+  _chips(battery) {
     const c = this._config;
-    const chip = (on, icon, label, entity) => {
-      if (on === null) return '';
-      return `<span class="chip ${on ? 'on' : 'off'}" data-entity="${esc(entity)}" title="${esc(label)}">
-        <ha-icon icon="${icon}"></ha-icon></span>`;
-    };
+    const chip = (on, icon, label, entity) => (on === null ? ''
+      : `<span class="chip ${on ? 'on' : 'off'}" data-entity="${esc(entity)}" title="${esc(label)}"><ha-icon icon="${icon}"></ha-icon></span>`);
     const parts = [
       chip(isOn(this._hass, c.wifi), 'mdi:wifi', 'WiFi', c.wifi),
       chip(isOn(this._hass, c.cloud), 'mdi:cloud-outline', 'Chmura', c.cloud),
       chip(isOn(this._hass, c.bluetooth), 'mdi:bluetooth', 'Bluetooth', c.bluetooth),
     ];
-    if (batt !== null) {
-      const lvl = batt <= 15 ? 'low' : 'ok';
-      const icon = batt > 90 ? 'mdi:battery' : batt > 10
-        ? `mdi:battery-${Math.round(batt / 10) * 10}` : 'mdi:battery-alert';
-      parts.push(`<span class="chip batt ${lvl}" data-entity="${esc(c.battery)}" title="Bateria">
-        <ha-icon icon="${icon}"></ha-icon><b>${Math.round(batt)}%</b></span>`);
+    if (battery !== null) {
+      const icon = battery > 90 ? 'mdi:battery'
+        : battery > 10 ? `mdi:battery-${Math.round(battery / 10) * 10}` : 'mdi:battery-alert';
+      parts.push(`<span class="chip batt ${battery <= 15 ? 'low' : ''}" data-entity="${esc(c.battery)}" title="Bateria"><ha-icon icon="${icon}"></ha-icon><b>${Math.round(battery)}%</b></span>`);
     }
     const html = parts.filter(Boolean).join('');
-    return html ? `<div class="chips">${html}</div>` : '';
+    return html ? `<span class="chips">${html}</span>` : '';
   }
 
   _alarmBanner() {
@@ -246,105 +393,24 @@ class WeberGrillCard extends HTMLElement {
     const sub = st.attributes?.text || '';
     return `<div class="alarm" data-entity="${esc(id)}">
       <ha-icon icon="mdi:bell-ring"></ha-icon>
-      <div><b>${esc(st.state)}</b>${sub ? `<span>${esc(sub)}</span>` : ''}</div>
-    </div>`;
+      <div><b>${esc(st.state)}</b>${sub ? `<span>${esc(sub)}</span>` : ''}</div></div>`;
   }
 
-  _bigReadout(cavity, target, color) {
-    return `<div class="readout" data-entity="${esc(this._config.cavity_temp)}">
-      <div class="val" style="color:${color}">${cavity === null ? '--' : Math.round(cavity)}<i>${esc(this._config.unit)}</i></div>
-      ${target === null ? '' : `<div class="tgt">cel ${Math.round(target)}${esc(this._config.unit)}</div>`}
-    </div>`;
-  }
-
-  /** A gas grill, drawn inline: no external assets, scales, themes cleanly. */
-  _grillSvg(heat, color, cavity, target) {
-    const glow = (0.15 + heat * 0.85).toFixed(2);
-    const anim = this._config.animate && heat > 0.12;
-    const smoke = anim ? `
-      <g class="smoke" opacity="${clamp(heat, 0, 0.7).toFixed(2)}">
-        <circle cx="96" cy="60" r="7"/>
-        <circle cx="120" cy="52" r="9"/>
-        <circle cx="146" cy="58" r="6"/>
-      </g>` : '';
-
-    return `
-    <div class="grill" data-entity="${esc(this._config.cavity_temp)}">
-      <svg viewBox="0 0 260 210" role="img" aria-label="Grill">
-        <defs>
-          <linearGradient id="lid" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stop-color="#4b5563"/><stop offset="100%" stop-color="#1f2937"/>
-          </linearGradient>
-          <linearGradient id="body" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stop-color="#374151"/><stop offset="100%" stop-color="#111827"/>
-          </linearGradient>
-          <radialGradient id="heat">
-            <stop offset="0%" stop-color="${color}" stop-opacity="${glow}"/>
-            <stop offset="100%" stop-color="${color}" stop-opacity="0"/>
-          </radialGradient>
-        </defs>
-
-        ${smoke}
-
-        <!-- heat halo escaping the lid seam -->
-        <ellipse cx="130" cy="106" rx="86" ry="26" fill="url(#heat)"/>
-
-        <!-- lid -->
-        <path d="M46 104 a84 60 0 0 1 168 0 z" fill="url(#lid)"/>
-        <path d="M46 104 a84 60 0 0 1 168 0" fill="none" stroke="#6b7280" stroke-width="2"/>
-        <rect x="118" y="40" width="24" height="7" rx="3.5" fill="#9ca3af"/>
-        <rect x="126" y="47" width="8" height="9" fill="#6b7280"/>
-
-        <!-- cavity readout on the lid -->
-        <text class="lid-val" x="130" y="96" text-anchor="middle" fill="${color}">
-          ${cavity === null ? '--' : Math.round(cavity)}<tspan class="deg">${esc(this._config.unit)}</tspan>
-        </text>
-        ${target === null ? '' : `<text class="lid-tgt" x="130" y="112" text-anchor="middle">cel ${Math.round(target)}${esc(this._config.unit)}</text>`}
-
-        <!-- fire box + seam -->
-        <rect x="44" y="104" width="172" height="8" rx="3" fill="#6b7280"/>
-        <rect x="48" y="112" width="164" height="34" rx="5" fill="url(#body)"/>
-
-        <!-- side shelves -->
-        <rect x="12" y="112" width="34" height="6" rx="3" fill="#4b5563"/>
-        <rect x="214" y="112" width="34" height="6" rx="3" fill="#4b5563"/>
-
-        <!-- control knobs -->
-        <g fill="#9ca3af">
-          <circle cx="78" cy="129" r="5"/><circle cx="102" cy="129" r="5"/><circle cx="126" cy="129" r="5"/>
-        </g>
-
-        <!-- cart + wheels -->
-        <rect x="62" y="146" width="12" height="40" fill="#374151"/>
-        <rect x="186" y="146" width="12" height="40" fill="#374151"/>
-        <rect x="62" y="168" width="136" height="7" rx="3" fill="#4b5563"/>
-        <circle cx="68" cy="192" r="12" fill="#1f2937" stroke="#4b5563" stroke-width="3"/>
-        <circle cx="192" cy="192" r="12" fill="#1f2937" stroke="#4b5563" stroke-width="3"/>
-      </svg>
-    </div>`;
-  }
-
-  _probesHtml() {
+  _probes() {
     const probes = this._config.probes || [];
     if (!probes.length) return '';
     const rows = probes.map((p, i) => {
       const t = numState(this._hass, p.temp);
       const tgt = numState(this._hass, p.target);
-      const pct = (t !== null && tgt !== null && tgt > 0)
-        ? clamp((t / tgt) * 100, 0, 100) : null;
+      const pct = (t !== null && tgt) ? clamp((t / tgt) * 100, 0, 100) : null;
       const col = tempColor(t);
-      const done = pct !== null && pct >= 100;
-      return `
-        <div class="probe${done ? ' done' : ''}" data-entity="${esc(p.temp)}">
-          <div class="prow">
-            <span class="pname"><ha-icon icon="mdi:thermometer-probe"></ha-icon>${esc(p.name || `Sonda ${i + 1}`)}</span>
-            <span class="pval" style="color:${col}">
-              ${t === null ? '--' : Math.round(t)}<i>${esc(this._config.unit)}</i>
-              ${tgt === null ? '' : `<u>/ ${Math.round(tgt)}${esc(this._config.unit)}</u>`}
-            </span>
-          </div>
-          ${pct === null ? '' : `<div class="bar"><span style="width:${pct.toFixed(1)}%;background:${col}"></span></div>`}
-        </div>`;
+      return `<div class="pr${pct !== null && pct >= 100 ? ' hit' : ''}" data-entity="${esc(p.temp)}">
+        <div class="prtop">
+          <span class="prname"><ha-icon icon="mdi:thermometer-probe"></ha-icon>${esc(p.name || `Sonda ${i + 1}`)}</span>
+          <span class="prval" style="color:${col}">${t === null ? '--' : Math.round(t)}${tgt === null ? '' : `<u>/ ${Math.round(tgt)} ${esc(this._config.unit)}</u>`}</span>
+        </div>
+        ${pct === null ? '' : `<div class="prbar"><i style="width:${pct.toFixed(1)}%;background:${col}"></i></div>`}
+      </div>`;
     }).join('');
     return `<div class="probes">${rows}</div>`;
   }
@@ -354,50 +420,66 @@ class WeberGrillCard extends HTMLElement {
       :host { display: block; }
       ha-card { overflow: hidden; }
       .card-header { font-size: 20px; font-weight: 400; padding: 12px 16px 0; margin: 0; }
-      .wrap { padding: 12px 16px 16px; }
+      .wrap { padding: 13px 16px 16px; }
       .wrap.offline { opacity: .55; }
-      .top { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
-      .name { font-size: 16px; font-weight: 500; color: var(--primary-text-color); }
-      .chips { display: flex; gap: 6px; align-items: center; }
-      .chip { display: inline-flex; align-items: center; gap: 3px; padding: 3px 6px; border-radius: 12px;
-              background: var(--secondary-background-color); cursor: pointer; }
-      .chip ha-icon { --mdc-icon-size: 16px; color: var(--disabled-text-color); }
-      .chip.on ha-icon { color: var(--state-icon-active-color, #f9a825); }
-      .chip b { font-size: 11px; color: var(--secondary-text-color); font-weight: 500; }
-      .chip.batt.low ha-icon, .chip.batt.low b { color: var(--error-color, #db4437); }
-      .hero { display: flex; justify-content: center; margin: 4px 0 2px; }
-      .grill { width: 100%; max-width: 320px; cursor: pointer; }
-      .grill svg { width: 100%; height: auto; display: block; }
-      .lid-val { font-size: 34px; font-weight: 600; font-family: var(--paper-font-headline_-_font-family, inherit); }
-      .lid-val .deg { font-size: 17px; }
-      .lid-tgt { font-size: 12px; fill: #cbd5e1; text-anchor: middle; }
-      .readout { text-align: center; cursor: pointer; padding: 8px 0; }
-      .readout .val { font-size: 46px; font-weight: 600; line-height: 1; }
-      .readout .val i { font-size: 22px; font-style: normal; }
-      .readout .tgt { font-size: 13px; color: var(--secondary-text-color); margin-top: 4px; }
-      .smoke circle { fill: #94a3b8; animation: rise 4s ease-in-out infinite; }
-      .smoke circle:nth-child(2) { animation-delay: -1.3s; }
-      .smoke circle:nth-child(3) { animation-delay: -2.6s; }
-      @keyframes rise { 0% { transform: translateY(6px); opacity: .1; }
-                        50% { opacity: .55; } 100% { transform: translateY(-16px); opacity: 0; } }
-      @media (prefers-reduced-motion: reduce) { .smoke circle { animation: none; } }
-      .probes { display: grid; gap: 8px; margin-top: 10px; }
-      .probe { background: var(--secondary-background-color); border-radius: 10px; padding: 8px 10px; cursor: pointer; }
-      .probe.done { box-shadow: inset 0 0 0 2px var(--success-color, #43a047); }
-      .prow { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
-      .pname { display: inline-flex; align-items: center; gap: 5px; font-size: 13px; color: var(--secondary-text-color); }
-      .pname ha-icon { --mdc-icon-size: 16px; }
-      .pval { font-size: 20px; font-weight: 600; }
-      .pval i { font-size: 12px; font-style: normal; }
-      .pval u { font-size: 12px; text-decoration: none; color: var(--secondary-text-color); margin-left: 3px; }
-      .bar { height: 4px; border-radius: 2px; background: var(--divider-color); margin-top: 6px; overflow: hidden; }
-      .bar span { display: block; height: 100%; border-radius: 2px; transition: width .6s ease; }
-      .alarm { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; padding: 8px 10px; cursor: pointer;
-               border-radius: 10px; background: var(--error-color, #db4437); color: #fff; }
-      .alarm ha-icon { --mdc-icon-size: 20px; }
-      .alarm b { font-size: 13px; display: block; }
-      .alarm span { font-size: 11px; opacity: .85; display: block; }
-      .offline-note { margin-top: 8px; text-align: center; font-size: 12px; color: var(--secondary-text-color); }
+      .hd { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+      .nm { font-size: 14px; font-weight: 600; letter-spacing: -.01em; color: var(--primary-text-color); }
+      .chips { display: flex; gap: 5px; }
+      .chip { min-width: 22px; height: 22px; padding: 0 5px; border-radius: 7px; display: inline-flex;
+              align-items: center; justify-content: center; gap: 4px; cursor: pointer;
+              background: var(--secondary-background-color); color: var(--disabled-text-color); }
+      .chip ha-icon { --mdc-icon-size: 14px; }
+      .chip.on { color: var(--state-icon-active-color, #f0a23c); }
+      .chip b { font-size: 11px; font-weight: 600; color: var(--secondary-text-color);
+                font-variant-numeric: tabular-nums; }
+      .chip.batt.low, .chip.batt.low b { color: var(--error-color, #db4437); }
+
+      .hero { margin-top: 8px; cursor: pointer; }
+      .hero svg { width: 100%; height: auto; display: block; }
+      .hero.illu { position: relative; }
+      .illuTgt { text-align: center; font-size: 12px; color: var(--secondary-text-color); margin-top: -4px; }
+      .hero.ring { display: grid; place-items: center; }
+      .hero.ring svg { max-width: 250px; }
+      .ringVal { font-size: 46px; font-weight: 700; letter-spacing: -.03em;
+                 font-family: var(--paper-font-headline_-_font-family, inherit); }
+      .ringLbl { font-size: 13px; fill: var(--secondary-text-color); }
+      .ringTgt { font-size: 12px; fill: var(--disabled-text-color); }
+      .lidVal { font-size: 21px; font-weight: 700; font-family: var(--paper-font-headline_-_font-family, inherit); }
+
+      .big { font-size: 62px; font-weight: 700; line-height: .92; letter-spacing: -.045em;
+             font-variant-numeric: tabular-nums; display: flex; align-items: flex-start; gap: 4px; }
+      .big.sm { font-size: 50px; }
+      .big sup { font-size: 20px; font-weight: 600; margin-top: 8px; letter-spacing: 0; }
+      .sub { display: flex; justify-content: space-between; margin-top: 9px;
+             font-size: 12px; color: var(--secondary-text-color); }
+      .track { height: 6px; border-radius: 3px; background: var(--divider-color); margin-top: 8px; overflow: hidden; }
+      .track i { display: block; height: 100%; border-radius: 3px; transition: width .6s ease; }
+      .hero.hybrid { display: grid; grid-template-columns: 1fr 108px; gap: 10px; align-items: center; }
+
+      .smoke path { animation: wgRise 4.5s ease-in-out infinite; }
+      .smoke path:nth-child(2) { animation-delay: -1.8s; }
+      @keyframes wgRise { 0% { transform: translateY(5px); opacity: .15; }
+                          50% { opacity: .6; } 100% { transform: translateY(-14px); opacity: 0; } }
+      @media (prefers-reduced-motion: reduce) { .smoke path { animation: none; } }
+
+      .probes { display: grid; gap: 7px; margin-top: 11px; }
+      .pr { background: var(--secondary-background-color); border-radius: 11px; padding: 9px 11px; cursor: pointer; }
+      .pr.hit { box-shadow: inset 0 0 0 1px var(--success-color, #43a047); }
+      .prtop { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+      .prname { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; color: var(--secondary-text-color); }
+      .prname ha-icon { --mdc-icon-size: 14px; }
+      .prval { font-size: 18px; font-weight: 650; font-variant-numeric: tabular-nums; letter-spacing: -.02em; }
+      .prval u { text-decoration: none; font-size: 11px; color: var(--disabled-text-color); font-weight: 500; margin-left: 3px; }
+      .prbar { height: 3px; border-radius: 2px; background: var(--divider-color); margin-top: 7px; overflow: hidden; }
+      .prbar i { display: block; height: 100%; border-radius: 2px; transition: width .6s ease; }
+
+      .alarm { display: flex; align-items: center; gap: 9px; margin-top: 10px; padding: 9px 11px;
+               border-radius: 11px; cursor: pointer; color: #fff;
+               background: linear-gradient(90deg, #7f1d1d, #9b2c2c); }
+      .alarm ha-icon { --mdc-icon-size: 18px; flex: none; }
+      .alarm b { font-size: 12.5px; display: block; }
+      .alarm span { font-size: 11px; opacity: .82; display: block; margin-top: 1px; }
+      .offline-note { margin-top: 9px; text-align: center; font-size: 12px; color: var(--secondary-text-color); }
     `;
   }
 }
@@ -406,28 +488,31 @@ class WeberGrillCard extends HTMLElement {
 // GUI editor — native ha-form, so entity fields get real HA pickers
 // ---------------------------------------------------------------------------
 const EDITOR_LABELS = {
-  title: 'Tytuł karty',
-  name: 'Nazwa grilla',
-  cavity_temp: 'Temperatura komory',
-  cavity_target: 'Cel komory',
-  battery: 'Bateria',
-  wifi: 'WiFi',
-  cloud: 'Chmura',
-  bluetooth: 'Bluetooth',
-  last_alarm: 'Ostatni alarm',
-  show_image: 'Pokaż grafikę grilla',
-  show_status: 'Pokaż ikony stanu',
-  animate: 'Animacja dymu',
-  alarm_minutes: 'Ukryj alarm po (min)',
+  title: 'Tytuł karty', name: 'Nazwa grilla', variant: 'Wygląd',
+  cavity_temp: 'Temperatura komory', cavity_target: 'Cel komory', battery: 'Bateria',
+  wifi: 'WiFi', cloud: 'Chmura', bluetooth: 'Bluetooth', last_alarm: 'Ostatni alarm',
+  show_status: 'Ikony stanu', animate: 'Animacja dymu', alarm_minutes: 'Ukryj alarm po (min)',
 };
 
 const EDITOR_SCHEMA = [
   { name: 'name', selector: { text: {} } },
   { name: 'title', selector: { text: {} } },
   {
-    name: '',
-    type: 'grid',
-    schema: [
+    name: 'variant',
+    selector: {
+      select: {
+        mode: 'dropdown',
+        options: [
+          { value: 'illustration', label: 'Ilustracja — rysowany grill' },
+          { value: 'ring', label: 'Pierścień — wskaźnik celu' },
+          { value: 'type', label: 'Typograficzny — sama liczba' },
+          { value: 'hybrid', label: 'Hybryda — liczba + grill' },
+        ],
+      },
+    },
+  },
+  {
+    name: '', type: 'grid', schema: [
       { name: 'cavity_temp', selector: { entity: { domain: 'sensor' } } },
       { name: 'cavity_target', selector: { entity: { domain: 'sensor' } } },
       { name: 'battery', selector: { entity: { domain: 'sensor' } } },
@@ -438,10 +523,7 @@ const EDITOR_SCHEMA = [
     ],
   },
   {
-    name: '',
-    type: 'grid',
-    schema: [
-      { name: 'show_image', selector: { boolean: {} } },
+    name: '', type: 'grid', schema: [
       { name: 'show_status', selector: { boolean: {} } },
       { name: 'animate', selector: { boolean: {} } },
       { name: 'alarm_minutes', selector: { number: { min: 0, max: 720, mode: 'box' } } },
@@ -466,14 +548,12 @@ class WeberGrillCardEditor extends HTMLElement {
   set hass(hass) {
     this._hass = hass;
     if (this._form) this._form.hass = hass;
-    this._renderProbes();
   }
 
   _emit() {
-    const ev = new CustomEvent('config-changed', {
+    this.dispatchEvent(new CustomEvent('config-changed', {
       detail: { config: this._config }, bubbles: true, composed: true,
-    });
-    this.dispatchEvent(ev);
+    }));
   }
 
   _render() {
@@ -488,7 +568,6 @@ class WeberGrillCardEditor extends HTMLElement {
                          background: var(--card-background-color, #fff); color: var(--primary-text-color); min-width: 0; }
           .probe button, .add { border: none; border-radius: 4px; padding: 7px 10px; cursor: pointer;
                                 background: var(--secondary-background-color); color: var(--primary-text-color); }
-          .add { margin-top: 4px; }
           .hint { font-size: 11px; color: var(--secondary-text-color); margin-bottom: 6px; }
         </style>
         <div id="form"></div>
@@ -515,7 +594,6 @@ class WeberGrillCardEditor extends HTMLElement {
       });
       this._built = true;
     }
-
     this._form.schema = EDITOR_SCHEMA;
     this._form.data = this._config;
     if (this._hass) this._form.hass = this._hass;
@@ -546,8 +624,7 @@ class WeberGrillCardEditor extends HTMLElement {
     host.querySelectorAll('button[data-del]').forEach((btn) => {
       btn.addEventListener('click', () => {
         const i = Number(btn.dataset.del);
-        const probes2 = (this._config.probes || []).filter((_, n) => n !== i);
-        this._config = { ...this._config, probes: probes2 };
+        this._config = { ...this._config, probes: (this._config.probes || []).filter((_, n) => n !== i) };
         this._emit();
         this._renderProbes();
       });
@@ -564,7 +641,7 @@ window.customCards.push({
   name: 'Weber Grill Card',
   description: 'Grill z temperaturą komory, sondami i alarmami sesji pieczenia',
   preview: true,
-  documentationURL: 'https://fg.iwanus.eu/jiwanus/grill-weber',
+  documentationURL: 'https://fg.iwanus.eu/jiwanus/weber-grill-card',
 });
 
 console.info(

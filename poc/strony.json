@@ -5,7 +5,7 @@
    "Grill: karta Lovelace",
    "Grill",
    "aktualne",
-   "Karta custom:weber-grill-card w czterech stanach, render na żywo z pliku produkcyjnego: zimny grill, rozgrzewanie, alarm sesji i grill niedostępny. Rysowany SVG grilla gazowego z odczytem komory na pokrywie, sondy z paskiem postępu, kolor odczytu wędruje od zimnego niebieskiego po żar. Suwaki zmieniają pierwszą kartę w czasie rzeczywistym. Karta jest wybieralna z galerii i ma edytor GUI na natywnych pickerach encji."
+   "Cztery wyglądy tej samej karty — jeden plik weber-grill-card.js, różnica tylko w opcji variant, więc kafelki są instancjami komponentu, nie makietami. A: rysowany grill z odczytem na plakietce i żarem spod pokrywy. B: pierścień pokazujący dojście do celu. C: sama liczba z paskiem. D: hybryda. Przyciski przełączają sytuacje (zimny, rozgrzewanie, cel osiągnięty, niedostępny), suwaki sterują wszystkimi naraz."
   ],
   [
    "tlo-obrazki.html",
