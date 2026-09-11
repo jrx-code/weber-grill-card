@@ -11,6 +11,11 @@
  *   artwork — the artwork alone, reading overlaid in the free corner
  *   compact — number leads, artwork alongside
  *   ring    — 270° gauge of progress towards the target
+ *   zoom    — thermo that zooms into the grill when you tap the artwork: the
+ *             gauge column collapses, the image comes closer with the lid held
+ *             still, and the cavity reading moves to the corner like artwork.
+ *             The probe list and the progress track stay through both states,
+ *             so the close-up costs no reading.
  *   type    — large number plus a target-marked track
  *
  * Photo vs. vector is not a look — it is the `artwork` option, so every layout
@@ -26,7 +31,7 @@
  * other looks already are. The card registers itself in the picker with a live preview.
  */
 
-const WEBER_CARD_VERSION = '1.8.1';
+const WEBER_CARD_VERSION = '1.9.1';
 
 // Cavity/probe colours: cold → warm → hot. Keyed on °C.
 const TEMP_STOPS = [
@@ -38,11 +43,25 @@ const TEMP_STOPS = [
   [350, '#b02020'],
 ];
 
-const VARIANTS = ['thermo', 'artwork', 'compact', 'ring', 'type'];
+const VARIANTS = ['thermo', 'artwork', 'compact', 'ring', 'type', 'zoom'];
 
 // Pre-1.7 looks that only differed by which image they drew. Kept so existing
 // dashboards keep rendering: the image moves to `artwork`, the look to `artwork`.
 const LEGACY_IMAGE_VARIANTS = { photo: 'photo', vector: 'vector' };
+
+// Close-up of the `zoom` look. 2.6 keeps the whole lid plus the shelf line in
+// frame; past that the lid, 350 px wide in the file, is drawn over 448 px and
+// starts to soften. The focus sits near the top edge, on the lid.
+// In this card the artwork FILLS its column (`.hero.thermo img { width: 100% }`),
+// so the element and the picture are the same box — no letterbox, and a plain
+// percentage origin lands exactly where it says. 1.8 about a point at 10 % of
+// the height leaves the band 5-61 % of the file in frame: the lid (top 23 %),
+// the side shelves and the control panel. Measured on the artwork by an alpha
+// profile; 2.6 was carried over from a mock that did have letterboxing and it
+// magnified the Weber badge into a slab.
+const ZOOM_SCALE = 1.8;
+const ZOOM_FOCUS_Y = 10;
+const ZOOM_MS = 420;
 
 // Card and editor strings. The language follows HA (hass.language) unless the
 // `language` option pins it; anything unknown falls back to English.
@@ -374,6 +393,8 @@ class WeberGrillCard extends HTMLElement {
         ${online ? '' : `<div class="offline-note">${esc(this._t.offline)}</div>`}
       </div>`;
 
+    if (c.variant === 'zoom') this._wireZoom();
+
     card.querySelectorAll('[data-entity]').forEach((el) => {
       el.addEventListener('click', (ev) => {
         ev.stopPropagation();
@@ -397,6 +418,7 @@ class WeberGrillCard extends HTMLElement {
     const pct = (cavity !== null && target) ? clamp((cavity / target) * 100, 0, 100) : null;
     switch (this._config.variant) {
       case 'thermo': return this._heroThermo(cavity, target, color, pct);
+      case 'zoom': return this._heroZoom(cavity, target, color, pct);
       case 'ring': return this._heroRing(cavity, target, color, pct);
       case 'type': return this._heroType(cavity, target, color, pct);
       case 'compact': return this._heroCompact(cavity, target, color, pct, heat);
@@ -447,7 +469,7 @@ class WeberGrillCard extends HTMLElement {
   }
 
   /** Gauge on the left, artwork on the right, readings placed over the cook box. */
-  _heroThermo(cavity, target, color, pct) {
+  _heroThermo(cavity, target, color, pct, extra = '') {
     const c = this._config;
     const L = { ...THERMO_LAYOUT, ...(c.layout || {}) };
     const glow = glowColor(cavity, c);
@@ -488,11 +510,47 @@ class WeberGrillCard extends HTMLElement {
         </div>
       </div>`;
 
-    return `<div class="hero thermo" data-entity="${esc(c.cavity_temp)}"
-                 style="grid-template-columns:${cols}">
+    return `<div class="hero thermo${extra}" data-entity="${esc(c.cavity_temp)}"
+                 style="grid-template-columns:${this._zoom && extra ? `0% 1fr` : cols}">
       ${gauge ? `<div class="tGauge">${this._gaugeSvg(cavity, target, color, pct)}</div>` : ''}
       ${artHtml}
     </div>`;
+  }
+
+  /** Thermo that zooms into the artwork on tap.
+   *
+   * Reuses the thermo composition rather than repeating it, and adds what
+   * thermo has not got: the progress track from compact. The probe list comes
+   * back on its own, because `_skipProbeList` drops it only for thermo — so in
+   * the close-up the probe is still readable, which is the one thing the plain
+   * artwork look loses.
+   */
+  _heroZoom(cavity, target, color, pct) {
+    const klasy = ' zoomable' + (this._zoom ? ' zoomed' : '');
+    return this._heroThermo(cavity, target, color, pct, klasy) + this._numTrack(pct, color);
+  }
+
+  /** Tap the artwork to toggle the close-up.
+   *
+   *  The DOM is changed in place instead of re-rendering: `_render` rewrites
+   *  `innerHTML`, and a replaced node has nothing to animate from. The focus
+   *  needs no tracking: it is a percentage, so it re-resolves by itself while
+   *  the column grows and the gauge collapses.
+   */
+  _wireZoom() {
+    const hero = this.shadowRoot?.querySelector('.hero.zoomable');
+    if (!hero) return;
+    const art = hero.querySelector('.tArt');
+    if (!art || art._wired) return;
+    art._wired = true;
+    art.addEventListener('click', (ev) => {
+      ev.stopPropagation();
+      this._zoom = !this._zoom;
+      hero.classList.toggle('zoomed', this._zoom);
+      hero.style.gridTemplateColumns = this._zoom
+        ? '0% 1fr'
+        : `${(this._config.layout?.ring_w ?? THERMO_LAYOUT.ring_w)}% 1fr`;
+    });
   }
 
   /** Shared 270° gauge body, used by the ring and thermo variants. */
@@ -672,6 +730,29 @@ class WeberGrillCard extends HTMLElement {
       .hero.thermo { display: grid; gap: 8px; align-items: center; }
       .hero.thermo .tGauge svg { width: 100%; height: auto; display: block; }
       .hero.thermo .tArt { display: flex; justify-content: center; }
+      /* The 'zoom' look. The artwork frame clips, so the close-up is the lens
+         moving in rather than the image growing out of the card: the picture is
+         nearly square (660x646) in a wide, short slot, and growing it by width
+         pushes the grill straight out of frame. The gauge column is animated to
+         zero instead of being hidden, so the artwork has somewhere to expand
+         into while the picture scales. */
+      .hero.thermo.zoomable { transition: grid-template-columns ${ZOOM_MS}ms cubic-bezier(.22,.61,.36,1); }
+      .hero.thermo.zoomable .tArt { overflow: hidden; cursor: pointer; }
+      .hero.thermo.zoomable .tArtInner {
+        transform-origin: 50% ${ZOOM_FOCUS_Y}%;
+        transition: transform ${ZOOM_MS}ms cubic-bezier(.22,.61,.36,1); }
+      .hero.thermo.zoomable.zoomed .tArtInner { transform: scale(${ZOOM_SCALE}); }
+      .hero.thermo.zoomable .tGauge { transition: opacity ${Math.round(ZOOM_MS * 0.7)}ms ease; }
+      .hero.thermo.zoomable.zoomed .tGauge { opacity: 0; }
+      /* Cavity reading travels from the lid to the corner, the way 'artwork'
+         holds it; the probe chip slides down onto the corpus so the close-up
+         does not leave it hanging in the air. */
+      .hero.thermo.zoomable .tCavity, .hero.thermo.zoomable .tProbe {
+        transition: left ${ZOOM_MS}ms cubic-bezier(.22,.61,.36,1),
+                    top ${ZOOM_MS}ms cubic-bezier(.22,.61,.36,1),
+                    font-size ${ZOOM_MS}ms cubic-bezier(.22,.61,.36,1); }
+      .hero.thermo.zoomable.zoomed .tCavity { left: 88% !important; top: 7% !important; }
+      .hero.thermo.zoomable.zoomed .tProbe { left: 82% !important; top: 66% !important; }
       .hero.thermo .tArtInner { position: relative; container-type: inline-size; }
       .hero.thermo img { width: 100%; height: auto; display: block; }
       .tGlow { position: absolute; transform: translate(-50%, -50%); border-radius: 50%;
