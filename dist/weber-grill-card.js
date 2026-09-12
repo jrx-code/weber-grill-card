@@ -34,7 +34,7 @@
  * other looks already are. The card registers itself in the picker with a live preview.
  */
 
-const WEBER_CARD_VERSION = '1.9.4';
+const WEBER_CARD_VERSION = '1.9.5';
 
 // Cavity/probe colours: cold → warm → hot. Keyed on °C.
 const TEMP_STOPS = [
@@ -673,8 +673,14 @@ class WeberGrillCard extends HTMLElement {
     return `
       :host { display: block; }
       ha-card { overflow: hidden; }
-      ${this._config.transparent ? `ha-card { background: none !important;
-        box-shadow: none !important; border: none !important; }` : ''}
+      ${this._config.transparent ? `
+        ha-card { background: none !important; box-shadow: none !important;
+                  border: none !important; }
+        .pr { background: none !important;
+              border: 1px solid rgba(from var(--primary-text-color) r g b / .22); }
+        @supports not (color: rgb(from white r g b)) {
+          .pr { border-color: var(--divider-color); }
+        }` : ''}
       .card-header { font-size: 20px; font-weight: 400; padding: 12px 16px 0; margin: 0; }
       .wrap { padding: 13px 16px 16px; }
       .wrap.offline { opacity: .55; }
