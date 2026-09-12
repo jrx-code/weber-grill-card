@@ -11,6 +11,9 @@
  *   artwork — the artwork alone, reading overlaid in the free corner
  *   compact — number leads, artwork alongside
  *   ring    — 270° gauge of progress towards the target
+ * `transparent: true` drops the card plate, for dashboards that put their
+ * own background behind it.
+ *
  *   zoom    — thermo that zooms into the grill when you tap the artwork: the
  *             gauge column collapses, the image comes closer with the lid held
  *             still, and the cavity reading moves to the corner like artwork.
@@ -31,7 +34,7 @@
  * other looks already are. The card registers itself in the picker with a live preview.
  */
 
-const WEBER_CARD_VERSION = '1.9.1';
+const WEBER_CARD_VERSION = '1.9.4';
 
 // Cavity/probe colours: cold → warm → hot. Keyed on °C.
 const TEMP_STOPS = [
@@ -52,16 +55,17 @@ const LEGACY_IMAGE_VARIANTS = { photo: 'photo', vector: 'vector' };
 // Close-up of the `zoom` look. 2.6 keeps the whole lid plus the shelf line in
 // frame; past that the lid, 350 px wide in the file, is drawn over 448 px and
 // starts to soften. The focus sits near the top edge, on the lid.
-// In this card the artwork FILLS its column (`.hero.thermo img { width: 100% }`),
-// so the element and the picture are the same box — no letterbox, and a plain
-// percentage origin lands exactly where it says. 1.8 about a point at 10 % of
-// the height leaves the band 5-61 % of the file in frame: the lid (top 23 %),
-// the side shelves and the control panel. Measured on the artwork by an alpha
-// profile; 2.6 was carried over from a mock that did have letterboxing and it
-// magnified the Weber badge into a slab.
-const ZOOM_SCALE = 1.8;
-const ZOOM_FOCUS_Y = 10;
+// The `zoom` look gives the artwork a frame of FIXED height and fits the
+// picture inside it, so the close-up is the same one the POC showed. The
+// picture is taller than the frame (646 vs ZOOM_ART_H), so it fills the frame
+// exactly in the vertical — which is what makes a percentage origin correct
+// here — and the grill sits at 49.7 % of the file horizontally, so 50 % is the
+// middle of it. Focus at 3 % and 2.6x leave the band 0-36 % in frame: the whole
+// lid (top 23 % of the file, measured by an alpha profile) plus the shelf line.
+const ZOOM_SCALE = 2.6;
+const ZOOM_FOCUS_Y = 3;
 const ZOOM_MS = 420;
+const ZOOM_ART_H = 320;
 
 // Card and editor strings. The language follows HA (hass.language) unless the
 // `language` option pins it; anything unknown falls back to English.
@@ -469,7 +473,7 @@ class WeberGrillCard extends HTMLElement {
   }
 
   /** Gauge on the left, artwork on the right, readings placed over the cook box. */
-  _heroThermo(cavity, target, color, pct, extra = '') {
+  _heroThermo(cavity, target, color, pct, extra = '', dodatek = '') {
     const c = this._config;
     const L = { ...THERMO_LAYOUT, ...(c.layout || {}) };
     const glow = glowColor(cavity, c);
@@ -493,7 +497,7 @@ class WeberGrillCard extends HTMLElement {
       </div>`;
 
     const artHtml = !art ? '' : `
-      <div class="tArt">
+      <div class="tArt">${dodatek}
         <div class="tArtInner" style="width:${L.img_scale}%">
           <img src="${esc(this._imgSrc(c.artwork))}" alt="Weber Spirit" loading="lazy">
           ${c.show_glow === false ? '' : `<div class="tGlow" style="
@@ -527,7 +531,11 @@ class WeberGrillCard extends HTMLElement {
    */
   _heroZoom(cavity, target, color, pct) {
     const klasy = ' zoomable' + (this._zoom ? ' zoomed' : '');
-    return this._heroThermo(cavity, target, color, pct, klasy) + this._numTrack(pct, color);
+    const rog = `<div class="zRead">
+      <span class="v" style="color:${color}">${cavity === null ? '--' : Math.round(cavity)}<sup>${esc(this._config.unit)}</sup></span>
+      ${target === null ? '' : `<span class="t">${esc(this._t.target)} ${Math.round(target)} ${esc(this._config.unit)}</span>`}
+    </div>`;
+    return this._heroThermo(cavity, target, color, pct, klasy, rog) + this._numTrack(pct, color);
   }
 
   /** Tap the artwork to toggle the close-up.
@@ -665,6 +673,8 @@ class WeberGrillCard extends HTMLElement {
     return `
       :host { display: block; }
       ha-card { overflow: hidden; }
+      ${this._config.transparent ? `ha-card { background: none !important;
+        box-shadow: none !important; border: none !important; }` : ''}
       .card-header { font-size: 20px; font-weight: 400; padding: 12px 16px 0; margin: 0; }
       .wrap { padding: 13px 16px 16px; }
       .wrap.offline { opacity: .55; }
@@ -737,11 +747,27 @@ class WeberGrillCard extends HTMLElement {
          zero instead of being hidden, so the artwork has somewhere to expand
          into while the picture scales. */
       .hero.thermo.zoomable { transition: grid-template-columns ${ZOOM_MS}ms cubic-bezier(.22,.61,.36,1); }
-      .hero.thermo.zoomable .tArt { overflow: hidden; cursor: pointer; }
+      .hero.thermo.zoomable .tArt { overflow: hidden; cursor: pointer;
+        height: ${ZOOM_ART_H}px; align-items: center; }
+      .hero.thermo.zoomable .tArtInner { width: 100% !important; height: 100%; }
+      .hero.thermo.zoomable .tArtInner img {
+        width: 100%; height: 100%; object-fit: contain; }
       .hero.thermo.zoomable .tArtInner {
         transform-origin: 50% ${ZOOM_FOCUS_Y}%;
         transition: transform ${ZOOM_MS}ms cubic-bezier(.22,.61,.36,1); }
       .hero.thermo.zoomable.zoomed .tArtInner { transform: scale(${ZOOM_SCALE}); }
+      .hero.thermo.zoomable .tArt { position: relative; }
+      .hero.thermo.zoomable .zRead { position: absolute; top: 2%; right: 2%; z-index: 2;
+        text-align: right; line-height: 1; opacity: 0; pointer-events: none;
+        transition: opacity ${Math.round(ZOOM_MS * 0.6)}ms ease; }
+      .hero.thermo.zoomable .zRead .v { font-size: 30px; font-weight: 500; }
+      .hero.thermo.zoomable .zRead .v sup { font-size: .5em; vertical-align: super; }
+      .hero.thermo.zoomable .zRead .t { display: block; margin-top: 4px; font-size: 12px;
+        color: var(--secondary-text-color); }
+      .hero.thermo.zoomable.zoomed .zRead { opacity: 1; }
+      .hero.thermo.zoomable .tCavity, .hero.thermo.zoomable .tProbe {
+        transition: opacity ${Math.round(ZOOM_MS * 0.5)}ms ease; }
+      .hero.thermo.zoomable.zoomed .tCavity, .hero.thermo.zoomable.zoomed .tProbe { opacity: 0; }
       .hero.thermo.zoomable .tGauge { transition: opacity ${Math.round(ZOOM_MS * 0.7)}ms ease; }
       .hero.thermo.zoomable.zoomed .tGauge { opacity: 0; }
       /* Cavity reading travels from the lid to the corner, the way 'artwork'
@@ -751,8 +777,7 @@ class WeberGrillCard extends HTMLElement {
         transition: left ${ZOOM_MS}ms cubic-bezier(.22,.61,.36,1),
                     top ${ZOOM_MS}ms cubic-bezier(.22,.61,.36,1),
                     font-size ${ZOOM_MS}ms cubic-bezier(.22,.61,.36,1); }
-      .hero.thermo.zoomable.zoomed .tCavity { left: 88% !important; top: 7% !important; }
-      .hero.thermo.zoomable.zoomed .tProbe { left: 82% !important; top: 66% !important; }
+
       .hero.thermo .tArtInner { position: relative; container-type: inline-size; }
       .hero.thermo img { width: 100%; height: auto; display: block; }
       .tGlow { position: absolute; transform: translate(-50%, -50%); border-radius: 50%;
