@@ -34,7 +34,7 @@
  * other looks already are. The card registers itself in the picker with a live preview.
  */
 
-const WEBER_CARD_VERSION = '1.9.5';
+const WEBER_CARD_VERSION = '1.9.6';
 
 // Cavity/probe colours: cold → warm → hot. Keyed on °C.
 const TEMP_STOPS = [
@@ -531,11 +531,34 @@ class WeberGrillCard extends HTMLElement {
    */
   _heroZoom(cavity, target, color, pct) {
     const klasy = ' zoomable' + (this._zoom ? ' zoomed' : '');
+    const c = this._config;
+    const probe = (c.probes || [])[0];
+    const pt = numState(this._hass, probe?.temp);
+    const ptgt = numState(this._hass, probe?.target);
+    const online = c.cavity_temp ? isAvailable(this._hass, c.cavity_temp) : true;
+    const pasek = (v, t, col) => (v === null || !t) ? '' :
+      `<div class="zbar"><i style="width:${clamp((v / t) * 100, 0, 100).toFixed(1)}%;background:${col}"></i></div>`;
+    // Zbliżenie ma DAWAĆ więcej, nie mniej: obok powiększonego grilla wchodzi
+    // komplet odczytów z celami i postępem. Blok leży poza `.tArtInner`, więc
+    // skalowanie obrazu go nie rusza.
+    const info = `<div class="zInfo">
+      <div class="zrow"><span class="k">${esc(this._t.cavity)}</span>
+        <span class="v" style="color:${color}">${cavity === null ? '--' : Math.round(cavity)}<i>${esc(c.unit)}</i></span>
+        <span class="t">${target === null ? '—' : esc(this._t.target) + ' ' + Math.round(target) + ' ' + c.unit}</span>
+        ${pasek(cavity, target, color)}</div>
+      ${!probe ? '' : `<div class="zrow"><span class="k">${esc(probe.name || this._t.probe)}</span>
+        <span class="v" style="color:${tempColor(pt)}">${pt === null ? '--' : Math.round(pt)}<i>${esc(c.unit)}</i></span>
+        <span class="t">${ptgt === null ? '—' : esc(this._t.target) + ' ' + Math.round(ptgt) + ' ' + c.unit}</span>
+        ${pasek(pt, ptgt, tempColor(pt))}</div>`}
+      <div class="zrow zlast"><span class="k">${esc(this._t.grill)}</span>
+        <span class="v s" style="color:${online ? 'var(--success-color)' : 'var(--error-color)'}">
+          ${online ? 'OK' : esc(this._t.offline)}</span></div>
+    </div>`;
     const rog = `<div class="zRead">
       <span class="v" style="color:${color}">${cavity === null ? '--' : Math.round(cavity)}<sup>${esc(this._config.unit)}</sup></span>
       ${target === null ? '' : `<span class="t">${esc(this._t.target)} ${Math.round(target)} ${esc(this._config.unit)}</span>`}
     </div>`;
-    return this._heroThermo(cavity, target, color, pct, klasy, rog) + this._numTrack(pct, color);
+    return this._heroThermo(cavity, target, color, pct, klasy, rog + info) + this._numTrack(pct, color);
   }
 
   /** Tap the artwork to toggle the close-up.
@@ -771,6 +794,30 @@ class WeberGrillCard extends HTMLElement {
       .hero.thermo.zoomable .zRead .t { display: block; margin-top: 4px; font-size: 12px;
         color: var(--secondary-text-color); }
       .hero.thermo.zoomable.zoomed .zRead { opacity: 1; }
+      /* Cel pod liczbą na pokrywie GINĄŁ: leży na czarnej pokrywie, w barwie
+         tekstu drugorzędnego. Nie jest tu potrzebny — pierścień pokazuje ten
+         sam cel pod swoją liczbą ('.ringTgt'), a w zbliżeniu niesie go blok
+         szczegółów. Na grafice zostaje sama temperatura komory. */
+      .hero.thermo.zoomable .tCavity .tgt { display: none; }
+      .hero.thermo.zoomable .zInfo { position: absolute; right: 2%; top: 22%; z-index: 2;
+        width: 44%; max-width: 300px; opacity: 0; pointer-events: none;
+        transform: translateX(8px);
+        transition: opacity ${ZOOM_MS}ms ease, transform ${ZOOM_MS}ms cubic-bezier(.22,.61,.36,1); }
+      .hero.thermo.zoomable.zoomed .zInfo { opacity: 1; transform: none; }
+      .hero.thermo.zoomable .zrow { padding: 7px 0 8px;
+        border-bottom: 1px solid var(--divider-color);
+        display: grid; grid-template-columns: 1fr auto; align-items: baseline; column-gap: 8px; }
+      .hero.thermo.zoomable .zrow.zlast { border-bottom: none; }
+      .hero.thermo.zoomable .zrow .k { font-size: 13px; color: var(--secondary-text-color); }
+      .hero.thermo.zoomable .zrow .v { font-size: 21px; text-align: right;
+        text-shadow: 0 1px 4px rgba(0,0,0,.75); }
+      .hero.thermo.zoomable .zrow .v.s { font-size: 14px; }
+      .hero.thermo.zoomable .zrow .v i { font-size: .55em; font-style: normal; vertical-align: super; }
+      .hero.thermo.zoomable .zrow .t { grid-column: 1 / -1; font-size: 11px;
+        color: var(--secondary-text-color); }
+      .hero.thermo.zoomable .zbar { grid-column: 1 / -1; height: 3px; border-radius: 2px;
+        background: var(--divider-color); overflow: hidden; margin-top: 6px; }
+      .hero.thermo.zoomable .zbar i { display: block; height: 100%; border-radius: 2px; }
       .hero.thermo.zoomable .tCavity, .hero.thermo.zoomable .tProbe {
         transition: opacity ${Math.round(ZOOM_MS * 0.5)}ms ease; }
       .hero.thermo.zoomable.zoomed .tCavity, .hero.thermo.zoomable.zoomed .tProbe { opacity: 0; }
