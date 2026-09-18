@@ -4,7 +4,7 @@
 
 Lovelace card for a Weber grill: cavity temperature, probes, connectivity and
 cook-session alerts. Built for the entities published by
-[weber-bridge](https://git.example.com/jrx-code/grill-weber), but every entity is
+[Weber Connect](https://github.com/jrx-code/hassio-integration-weber), but every entity is
 configurable — any temperature source works.
 
 🇵🇱 [Polska wersja tego pliku](README.pl.md)
