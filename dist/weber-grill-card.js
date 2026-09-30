@@ -2,8 +2,9 @@
  * Weber Grill Card — Home Assistant Lovelace custom card.
  *
  * Shows cavity temperature, probes, connectivity and cook-session alerts for a
- * Weber grill. Built for the entities published by weber-bridge (grill-weber
- * repo), but every entity is configurable, so any temperature source works.
+ * Weber grill. Built for the entities published by the Weber Connect
+ * integration (hassio-integration-weber), but every entity is configurable, so
+ * any temperature source works.
  *
  * Visual variants live in this file and are picked with `variant`, so the preview
  * page renders the production component rather than a look-alike:
