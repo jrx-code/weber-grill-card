@@ -4,7 +4,7 @@
 
 Karta Lovelace do grilla Weber: temperatura komory, sondy, łączność i alarmy
 sesji pieczenia. Powstała dla encji publikowanych przez
-[weber-bridge](https://git.example.com/jrx-code/grill-weber), ale każda encja jest
+[Weber Connect](https://github.com/jrx-code/hassio-integration-weber), ale każda encja jest
 konfigurowalna — zadziała z dowolnym źródłem temperatury.
 
 🇬🇧 [English version of this file](README.md)
