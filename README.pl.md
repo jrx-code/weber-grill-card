@@ -24,8 +24,12 @@ konfigurowalna — zadziała z dowolnym źródłem temperatury.
 - **Ikony stanu** — WiFi, chmura, Bluetooth, bateria; każda otwiera szczegóły.
 - **Grill niedostępny** — karta przygasa i mówi to wprost, zamiast pokazywać
   ostatnią znaną liczbę jak aktualną.
-- **Pięć wyglądów**, różnica to jedna opcja: `thermo`, `artwork`, `compact`,
-  `ring`, `type` — a pod każdym z nich zdjęcie albo wektor.
+- **Sześć wyglądów**, różnica to jedna opcja: `thermo`, `artwork`, `compact`,
+  `ring`, `type`, `zoom` — a pod każdym z nich zdjęcie albo wektor. `zoom` to
+  `thermo`, który przybliża grill po stuknięciu w grafikę: kolumna wskaźnika
+  się chowa, a odczyt komory przechodzi do rogu.
+- **Tryb przezroczysty** — `transparent: true` usuwa tło karty (i tło kafelka
+  sondy) na dashboardach z własnym tłem.
 - **Polski i angielski**, zgodnie z językiem Home Assistant albo ustawiony
   sztywno per karta.
 
@@ -60,7 +64,7 @@ to, co zapisuje edytor.
 ```yaml
 type: custom:weber-grill-card
 name: Spirit EX325
-variant: thermo          # artwork | compact | ring | type
+variant: thermo          # artwork | compact | ring | type | zoom
 artwork: photo           # photo | vector
 language: auto           # auto | pl | en
 cavity_temp: sensor.spirit_ex325_temperatura_komory
@@ -85,6 +89,7 @@ probes:
 | `variant` | tekst | `thermo` | wygląd; zdjęcie/wektor to `artwork`, nie wygląd |
 | `artwork` | tekst | `photo` | `photo` albo `vector` |
 | `language` | tekst | `auto` | `auto` idzie za Home Assistant |
+| `transparent` | tak/nie | `false` | bez tła, ramki i cienia karty; kafelki sond zostają tylko z obrysem — tylko YAML, bez przełącznika w GUI |
 | `cavity_temp` / `cavity_target` | encja | — | temperatura komory i cel |
 | `battery` | encja | — | poziom baterii |
 | `wifi` / `cloud` / `bluetooth` | encja | — | ikony łączności |

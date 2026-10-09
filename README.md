@@ -23,8 +23,12 @@ configurable — any temperature source works.
 - **Status chips** — WiFi, cloud, Bluetooth, battery; each opens more-info.
 - **Offline handling** — the card dims and says so instead of presenting a stale
   number as current.
-- **Five looks**, one option apart: `thermo`, `artwork`, `compact`, `ring`,
-  `type` — with photo or vector artwork under each of them.
+- **Six looks**, one option apart: `thermo`, `artwork`, `compact`, `ring`,
+  `type`, `zoom` — with photo or vector artwork under each of them. `zoom` is
+  `thermo` that comes closer when you tap the artwork: the gauge column
+  collapses and the cavity reading moves to the corner.
+- **Transparent mode** — `transparent: true` drops the card plate (and the
+  probe tile background) for dashboards with their own background.
 - **Polish and English**, following Home Assistant's language or pinned per card.
 
 ## Install
@@ -56,7 +60,7 @@ coordinate, and centre / reset shortcuts. YAML below is what the editor writes.
 ```yaml
 type: custom:weber-grill-card
 name: Spirit EX325
-variant: thermo          # artwork | compact | ring | type
+variant: thermo          # artwork | compact | ring | type | zoom
 artwork: photo           # photo | vector
 language: auto           # auto | pl | en
 cavity_temp: sensor.spirit_ex325_temperatura_komory
@@ -81,6 +85,7 @@ probes:
 | `variant` | string | `thermo` | look; photo vs. vector is `artwork`, not a look |
 | `artwork` | string | `photo` | `photo` or `vector` |
 | `language` | string | `auto` | `auto` follows Home Assistant |
+| `transparent` | bool | `false` | no card background, border or shadow; probe tiles keep only an outline — YAML only, no GUI switch |
 | `cavity_temp` / `cavity_target` | entity | — | cavity temperature and target |
 | `battery` | entity | — | battery percentage |
 | `wifi` / `cloud` / `bluetooth` | entity | — | connectivity chips |
